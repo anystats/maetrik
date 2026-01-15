@@ -1,0 +1,39 @@
+# maetrik configuration file
+# Copy this to maetrik.config.yaml and customize
+
+server:
+  port: 3000
+  host: "localhost"
+
+# Database connections
+connections:
+  main:
+    driver: postgres
+    host: localhost
+    port: 5432
+    database: myapp
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+# LLM provider
+llm:
+  driver: ollama
+  model: llama3
+  baseUrl: http://localhost:11434
+  # Or for OpenAI:
+  # driver: openai
+  # model: gpt-4o
+  # apiKey: ${OPENAI_API_KEY}
+
+# Authentication
+auth:
+  driver: none
+  # Or for password auth:
+  # driver: password
+  # sessionSecret: ${SESSION_SECRET}
+
+# State storage
+storage:
+  driver: sqlite
+  path: ./data/maetrik.db
+
