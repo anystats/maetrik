@@ -11,7 +11,7 @@ export function createDriverManager(
     async initialize(): Promise<void> {
       for (const [name, config] of Object.entries(options.connections)) {
         const driver = registry.createDriver(config.driver);
-        await driver.init(config as unknown as Record<string, unknown>);
+        await driver.init(config);
         drivers.set(name, driver);
       }
     },

@@ -1,3 +1,5 @@
+import type { ConnectionConfig, LLMConfig } from './config.js';
+
 export interface DriverCapabilities {
   streaming?: boolean;
   explain?: boolean;
@@ -31,7 +33,7 @@ export interface QueryResult {
 export interface DatabaseDriver {
   readonly name: string;
   readonly dialect: string;
-  init(config: Record<string, unknown>): Promise<void>;
+  init(config: ConnectionConfig): Promise<void>;
   healthCheck(): Promise<boolean>;
   shutdown(): Promise<void>;
   introspect(): Promise<SchemaDefinition>;
@@ -41,7 +43,7 @@ export interface DatabaseDriver {
 
 export interface LLMDriver {
   readonly name: string;
-  init(config: Record<string, unknown>): Promise<void>;
+  init(config: LLMConfig): Promise<void>;
   complete(prompt: string, options?: Record<string, unknown>): Promise<string>;
   embed?(text: string): Promise<number[]>;
   capabilities(): {
