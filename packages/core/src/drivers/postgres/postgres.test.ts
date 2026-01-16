@@ -76,3 +76,122 @@ describe('PostgresDriver', () => {
     expect(factoryDriver.dialect).toBe('postgresql');
   });
 });
+
+describe('PostgresDriver - Schema Introspection', () => {
+  let driver: DatabaseDriver;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    driver = createPostgresDriver();
+
+    // Setup mock query responses for introspection
+    const pg = await import('pg');
+    const mockClient = new pg.default.Client();
+
+    // Mock the tables query
+    (mockClient.query as ReturnType<typeof vi.fn>).mockImplementation(
+      async (sql: string) => {
+        if (sql.includes('information_schema.tables')) {
+          return {
+            rows: [
+              { table_name: 'users' },
+              { table_name: 'orders' },
+            ],
+          };
+        }
+        if (sql.includes('information_schema.columns')) {
+          return {
+            rows: [
+              {
+                table_name: 'users',
+                column_name: 'id',
+                data_type: 'uuid',
+                is_nullable: 'NO',
+              },
+              {
+                table_name: 'users',
+                column_name: 'email',
+                data_type: 'character varying',
+                is_nullable: 'NO',
+              },
+              {
+                table_name: 'orders',
+                column_name: 'id',
+                data_type: 'uuid',
+                is_nullable: 'NO',
+              },
+              {
+                table_name: 'orders',
+                column_name: 'user_id',
+                data_type: 'uuid',
+                is_nullable: 'YES',
+              },
+            ],
+          };
+        }
+        if (sql.includes('pg_indexes')) {
+          return {
+            rows: [
+              { table_name: 'users', indexdef: 'CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)' },
+              { table_name: 'orders', indexdef: 'CREATE UNIQUE INDEX orders_pkey ON public.orders USING btree (id)' },
+            ],
+          };
+        }
+        return { rows: [], fields: [] };
+      }
+    );
+
+    await driver.init({
+      driver: 'postgres',
+      host: 'localhost',
+      port: 5432,
+      database: 'test',
+    });
+  });
+
+  afterEach(async () => {
+    await driver.shutdown();
+  });
+
+  it('introspects tables from database', async () => {
+    const schema = await driver.introspect();
+
+    expect(schema.tables).toHaveProperty('users');
+    expect(schema.tables).toHaveProperty('orders');
+  });
+
+  it('introspects columns with types', async () => {
+    const schema = await driver.introspect();
+
+    expect(schema.tables.users.columns).toContainEqual(
+      expect.objectContaining({
+        name: 'id',
+        type: 'uuid',
+        nullable: false,
+      })
+    );
+    expect(schema.tables.users.columns).toContainEqual(
+      expect.objectContaining({
+        name: 'email',
+        type: 'character varying',
+        nullable: false,
+      })
+    );
+  });
+
+  it('identifies nullable columns', async () => {
+    const schema = await driver.introspect();
+
+    const userIdCol = schema.tables.orders.columns.find(
+      (c) => c.name === 'user_id'
+    );
+    expect(userIdCol?.nullable).toBe(true);
+  });
+
+  it('identifies primary key columns', async () => {
+    const schema = await driver.introspect();
+
+    const idCol = schema.tables.users.columns.find((c) => c.name === 'id');
+    expect(idCol?.primaryKey).toBe(true);
+  });
+});
