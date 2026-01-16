@@ -1,7 +1,10 @@
+import pino from 'pino';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface LoggerOptions {
   level?: LogLevel;
+  pretty?: boolean;
 }
 
 export interface Logger {
@@ -9,50 +12,85 @@ export interface Logger {
   info(message: string, meta?: Record<string, unknown>): void;
   warn(message: string, meta?: Record<string, unknown>): void;
   error(message: string, meta?: Record<string, unknown>): void;
+  child(bindings: Record<string, unknown>): Logger;
 }
 
-const LOG_LEVELS: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
+// Map our log levels to pino levels
+const PINO_LEVELS: Record<LogLevel, string> = {
+  debug: 'debug',
+  info: 'info',
+  warn: 'warn',
+  error: 'error',
 };
 
-export function createLogger(context: string, options: LoggerOptions = {}): Logger {
-  const level = options.level ?? 'info';
-  const levelValue = LOG_LEVELS[level];
+// Singleton root logger instance
+let rootLogger: pino.Logger | null = null;
 
-  const formatMessage = (lvl: LogLevel, message: string, meta?: Record<string, unknown>): string => {
-    const timestamp = new Date().toISOString();
-    const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
-    return `[${timestamp}] [${lvl.toUpperCase()}] [${context}] ${message}${metaStr}`;
-  };
+function getRootLogger(options: LoggerOptions = {}): pino.Logger {
+  if (!rootLogger) {
+    const isPretty = options.pretty ?? process.env.NODE_ENV !== 'production';
+    const level = options.level ?? (process.env.LOG_LEVEL as LogLevel) ?? 'info';
 
-  const shouldLog = (lvl: LogLevel): boolean => {
-    return LOG_LEVELS[lvl] >= levelValue;
-  };
+    rootLogger = pino({
+      level: PINO_LEVELS[level],
+      ...(isPretty && {
+        transport: {
+          target: 'pino-pretty',
+          options: {
+            colorize: true,
+            translateTime: 'SYS:standard',
+            ignore: 'pid,hostname',
+          },
+        },
+      }),
+    });
+  }
+  return rootLogger;
+}
 
+function wrapPinoLogger(pinoLogger: pino.Logger): Logger {
   return {
     debug(message: string, meta?: Record<string, unknown>) {
-      if (shouldLog('debug')) {
-        console.log(formatMessage('debug', message, meta));
+      if (meta) {
+        pinoLogger.debug(meta, message);
+      } else {
+        pinoLogger.debug(message);
       }
     },
     info(message: string, meta?: Record<string, unknown>) {
-      if (shouldLog('info')) {
-        console.log(formatMessage('info', message, meta));
+      if (meta) {
+        pinoLogger.info(meta, message);
+      } else {
+        pinoLogger.info(message);
       }
     },
     warn(message: string, meta?: Record<string, unknown>) {
-      if (shouldLog('warn')) {
-        console.warn(formatMessage('warn', message, meta));
+      if (meta) {
+        pinoLogger.warn(meta, message);
+      } else {
+        pinoLogger.warn(message);
       }
     },
     error(message: string, meta?: Record<string, unknown>) {
-      if (shouldLog('error')) {
-        console.error(formatMessage('error', message, meta));
+      if (meta) {
+        pinoLogger.error(meta, message);
+      } else {
+        pinoLogger.error(message);
       }
+    },
+    child(bindings: Record<string, unknown>): Logger {
+      return wrapPinoLogger(pinoLogger.child(bindings));
     },
   };
 }
 
+export function createLogger(context: string, options: LoggerOptions = {}): Logger {
+  const root = getRootLogger(options);
+  const childLogger = root.child({ context });
+  return wrapPinoLogger(childLogger);
+}
+
+// Reset root logger (useful for testing)
+export function resetLogger(): void {
+  rootLogger = null;
+}
