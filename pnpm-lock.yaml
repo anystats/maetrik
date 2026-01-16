@@ -17,6 +17,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@maetrik/core':
+        specifier: workspace:^
+        version: link:../../packages/core
       '@maetrik/shared':
         specifier: workspace:*
         version: link:../../packages/shared
