@@ -7,6 +7,7 @@ import {
   type DriverManager,
 } from '@maetrik/core';
 import { createConnectionsRouter } from './routes/connections.js';
+import { createQueryRouter } from './routes/query.js';
 
 const startTime = Date.now();
 
@@ -51,6 +52,12 @@ export function createApp(options: AppOptions = {}): express.Express {
   app.use(
     '/api/v1/connections',
     createConnectionsRouter({ connections, driverManager })
+  );
+
+  // Query API
+  app.use(
+    '/api/v1/query',
+    createQueryRouter({ driverManager })
   );
 
   // 404 handler
