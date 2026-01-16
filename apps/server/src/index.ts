@@ -1,30 +1,13 @@
 import { createApp, getAppContext } from './app.js';
 import { loadConfig, createLogger } from '@maetrik/shared';
-import {
-  autodiscoverDrivers,
-  createDriverManager,
-  createDriverRegistry,
-} from '@maetrik/core';
+import { createDriverManagerFromConfig } from '@maetrik/core';
 
 const logger = createLogger('server');
 
 async function main() {
   const config = await loadConfig({ env: process.env as Record<string, string> });
 
-  const registry = createDriverRegistry();
-  const discovered = await autodiscoverDrivers();
-
-  for (const { factory } of discovered.drivers) {
-    registry.register(factory);
-  }
-
-  for (const { packageName, error } of discovered.errors) {
-    logger.warn('Failed to load driver', { packageName, error });
-  }
-
-  const driverManager = createDriverManager(registry, {
-    connections: config.connections,
-  });
+  const driverManager = await createDriverManagerFromConfig(config.connections, logger);
 
   const app = createApp({
     connections: config.connections,

@@ -33,36 +33,6 @@ function interpolateObject(
   return obj;
 }
 
-function applyEnvOverrides(
-  config: MaetrikConfigInput,
-  env: Record<string, string | undefined>
-): MaetrikConfigInput {
-  const result = { ...config };
-
-  // Server overrides
-  if (env.MAETRIK_SERVER_PORT) {
-    result.server = { ...result.server, port: parseInt(env.MAETRIK_SERVER_PORT, 10) };
-  }
-  if (env.MAETRIK_SERVER_HOST) {
-    result.server = { ...result.server, host: env.MAETRIK_SERVER_HOST };
-  }
-
-  // LLM overrides
-  if (env.MAETRIK_LLM_DRIVER) {
-    result.llm = { ...result.llm, driver: env.MAETRIK_LLM_DRIVER };
-  }
-  if (env.MAETRIK_LLM_API_KEY) {
-    result.llm = { ...result.llm, apiKey: env.MAETRIK_LLM_API_KEY };
-  }
-
-  // Storage overrides
-  if (env.MAETRIK_STORAGE_DRIVER) {
-    result.storage = { ...result.storage, driver: env.MAETRIK_STORAGE_DRIVER };
-  }
-
-  return result;
-}
-
 export async function loadConfig(options: LoadConfigOptions = {}): Promise<MaetrikConfig> {
   const { configPath = './maetrik.config.yaml', env = {} } = options;
 
@@ -74,8 +44,7 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<Maetr
     fileConfig = interpolated;
   }
 
-  const withEnvOverrides = applyEnvOverrides(fileConfig, env);
-  const validated = maetrikConfigSchema.parse(withEnvOverrides);
+  const validated = maetrikConfigSchema.parse(fileConfig);
 
   return validated as MaetrikConfig;
 }

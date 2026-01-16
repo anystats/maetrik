@@ -18,6 +18,26 @@ cp maetrik.config.example.yaml maetrik.config.yaml
 pnpm dev
 ```
 
+## Configuration
+
+Maetrik uses a single YAML configuration file (`maetrik.config.yaml`). Use `${ENV_VAR}` syntax to inject environment variables for secrets and per-environment values:
+
+```yaml
+connections:
+  main:
+    driver: postgres
+    host: ${DB_HOST}
+    database: ${DB_NAME}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+llm:
+  driver: openai
+  apiKey: ${OPENAI_API_KEY}
+```
+
+Missing environment variables resolve to empty strings. Zod schema defaults apply for omitted fields (e.g., `server.port` defaults to `3000`).
+
 ## Development
 
 ```bash
