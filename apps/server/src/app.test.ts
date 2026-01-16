@@ -1,16 +1,59 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
-import type { DriverManager } from '@maetrik/core';
+
+// Mock core modules
+vi.mock('@maetrik/core', () => ({
+  createDriverRegistry: vi.fn(() => ({
+    register: vi.fn(),
+    get: vi.fn(),
+    list: vi.fn(() => []),
+    createDriver: vi.fn(),
+  })),
+  createDriverManager: vi.fn(() => ({
+    initialize: vi.fn().mockResolvedValue(undefined),
+    getDriver: vi.fn(() => undefined),
+    healthCheck: vi.fn().mockResolvedValue(false),
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  })),
+  postgresDriverFactory: { name: 'postgres', dialect: 'postgresql', create: vi.fn() },
+  createLLMRegistry: vi.fn(() => ({
+    register: vi.fn(),
+    get: vi.fn(),
+    list: vi.fn(() => []),
+    createDriver: vi.fn(),
+  })),
+  createLLMManager: vi.fn(() => ({
+    initialize: vi.fn().mockResolvedValue(undefined),
+    getDriver: vi.fn(() => undefined),
+    complete: vi.fn().mockResolvedValue({ content: '' }),
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  })),
+  ollamaDriverFactory: { name: 'ollama', create: vi.fn() },
+  openaiDriverFactory: { name: 'openai', create: vi.fn() },
+  createQueryTranslator: vi.fn(() => ({
+    translate: vi.fn().mockResolvedValue({
+      sql: 'SELECT 1',
+      explanation: 'Test',
+      confidence: 1,
+      suggestedTables: [],
+    }),
+  })),
+  createSemanticLayer: vi.fn(() => ({
+    getSchema: vi.fn().mockReturnValue({ tables: {} }),
+    toSchemaDefinition: vi.fn().mockReturnValue({ tables: {} }),
+    inferRelationships: vi.fn(),
+  })),
+}));
 
 describe('Server App', () => {
-  const driverManager: DriverManager = {
-    initialize: async () => {},
-    getDriver: () => undefined,
-    healthCheck: async () => false,
-    shutdown: async () => {},
+  const mockDriverManager = {
+    initialize: vi.fn().mockResolvedValue(undefined),
+    getDriver: vi.fn(() => undefined),
+    healthCheck: vi.fn().mockResolvedValue(false),
+    shutdown: vi.fn().mockResolvedValue(undefined),
   };
-  const app = createApp({ driverManager });
+  const app = createApp({ driverManager: mockDriverManager as any });
 
   describe('GET /health', () => {
     it('returns 200 with status ok', async () => {

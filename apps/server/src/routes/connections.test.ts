@@ -2,14 +2,71 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 import type { Express } from 'express';
-import type { DriverManager } from '@maetrik/core';
+
+// Mock core modules
+vi.mock('@maetrik/core', () => ({
+  createDriverRegistry: vi.fn(() => ({
+    register: vi.fn(),
+    get: vi.fn(),
+    list: vi.fn(() => ['postgres']),
+    createDriver: vi.fn(),
+  })),
+  createDriverManager: vi.fn(() => ({
+    initialize: vi.fn().mockResolvedValue(undefined),
+    getDriver: vi.fn(() => ({
+      name: 'postgres',
+      dialect: 'postgresql',
+      healthCheck: vi.fn().mockResolvedValue(true),
+      introspect: vi.fn().mockResolvedValue({
+        tables: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'uuid', nullable: false, primaryKey: true },
+            ],
+          },
+        },
+      }),
+    })),
+    healthCheck: vi.fn().mockResolvedValue(true),
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  })),
+  postgresDriverFactory: { name: 'postgres', dialect: 'postgresql', create: vi.fn() },
+  createLLMRegistry: vi.fn(() => ({
+    register: vi.fn(),
+    get: vi.fn(),
+    list: vi.fn(() => ['ollama']),
+    createDriver: vi.fn(),
+  })),
+  createLLMManager: vi.fn(() => ({
+    initialize: vi.fn().mockResolvedValue(undefined),
+    getDriver: vi.fn(() => ({ name: 'ollama' })),
+    complete: vi.fn().mockResolvedValue({ content: '' }),
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  })),
+  ollamaDriverFactory: { name: 'ollama', create: vi.fn() },
+  openaiDriverFactory: { name: 'openai', create: vi.fn() },
+  createQueryTranslator: vi.fn(() => ({
+    translate: vi.fn().mockResolvedValue({
+      sql: 'SELECT 1',
+      explanation: 'Test',
+      confidence: 1,
+      suggestedTables: [],
+    }),
+  })),
+  createSemanticLayer: vi.fn(() => ({
+    getSchema: vi.fn().mockReturnValue({ tables: {} }),
+    toSchemaDefinition: vi.fn().mockReturnValue({ tables: {} }),
+    inferRelationships: vi.fn(),
+  })),
+}));
 
 describe('Connections API', () => {
   let app: Express;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const driverManager: DriverManager = {
+    const mockDriverManager = {
       initialize: vi.fn().mockResolvedValue(undefined),
       getDriver: vi.fn(() => ({
         name: 'postgres',
@@ -38,7 +95,7 @@ describe('Connections API', () => {
           database: 'test',
         },
       },
-      driverManager,
+      driverManager: mockDriverManager as any,
     });
   });
 

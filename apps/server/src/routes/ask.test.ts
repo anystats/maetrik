@@ -18,6 +18,18 @@ vi.mock('@maetrik/core', () => ({
         return {
           name: 'postgres',
           dialect: 'postgresql',
+          healthCheck: vi.fn().mockResolvedValue(true),
+          introspect: vi.fn().mockResolvedValue({
+            tables: {
+              users: {
+                name: 'users',
+                columns: [
+                  { name: 'id', type: 'uuid', nullable: false, primaryKey: true },
+                  { name: 'email', type: 'varchar', nullable: false },
+                ],
+              },
+            },
+          }),
           execute: vi.fn().mockResolvedValue({
             columns: ['count'],
             rows: [{ count: 42 }],
@@ -40,17 +52,24 @@ vi.mock('@maetrik/core', () => ({
   createLLMManager: vi.fn(() => ({
     initialize: vi.fn().mockResolvedValue(undefined),
     getDriver: vi.fn(() => ({ name: 'ollama' })),
-    complete: vi.fn().mockResolvedValue({ content: '' }),
+    complete: vi.fn().mockResolvedValue({
+      content: JSON.stringify({
+        sql: 'SELECT COUNT(*) as count FROM users',
+        explanation: 'Counts all users in the database',
+        confidence: 0.95,
+        tables: ['users'],
+      }),
+    }),
     shutdown: vi.fn().mockResolvedValue(undefined),
   })),
   ollamaDriverFactory: { name: 'ollama', create: vi.fn() },
   openaiDriverFactory: { name: 'openai', create: vi.fn() },
   createQueryTranslator: vi.fn(() => ({
     translate: vi.fn().mockResolvedValue({
-      sql: 'SELECT 1',
-      explanation: 'Test',
-      confidence: 1,
-      suggestedTables: [],
+      sql: 'SELECT COUNT(*) as count FROM users',
+      explanation: 'Counts all users',
+      confidence: 0.95,
+      suggestedTables: ['users'],
     }),
   })),
   createSemanticLayer: vi.fn(() => ({
@@ -60,10 +79,10 @@ vi.mock('@maetrik/core', () => ({
   })),
 }));
 
-describe('Query API', () => {
+describe('Ask API', () => {
   let app: Express;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     const mockDriverManager = {
       initialize: vi.fn().mockResolvedValue(undefined),
@@ -72,6 +91,18 @@ describe('Query API', () => {
           return {
             name: 'postgres',
             dialect: 'postgresql',
+            healthCheck: vi.fn().mockResolvedValue(true),
+            introspect: vi.fn().mockResolvedValue({
+              tables: {
+                users: {
+                  name: 'users',
+                  columns: [
+                    { name: 'id', type: 'uuid', nullable: false, primaryKey: true },
+                    { name: 'email', type: 'varchar', nullable: false },
+                  ],
+                },
+              },
+            }),
             execute: vi.fn().mockResolvedValue({
               columns: ['count'],
               rows: [{ count: 42 }],
@@ -93,30 +124,34 @@ describe('Query API', () => {
           database: 'test',
         },
       },
+      llm: {
+        driver: 'ollama',
+        model: 'llama3',
+      },
       driverManager: mockDriverManager as any,
     });
   });
 
-  describe('POST /api/v1/query', () => {
-    it('executes SQL query and returns results', async () => {
+  describe('POST /api/v1/ask', () => {
+    it('translates natural language to SQL and executes', async () => {
       const response = await request(app)
-        .post('/api/v1/query')
+        .post('/api/v1/ask')
         .send({
+          question: 'How many users are there?',
           connection: 'main',
-          sql: 'SELECT COUNT(*) as count FROM users',
         });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.columns).toContain('count');
-      expect(response.body.data.rows[0].count).toBe(42);
+      expect(response.body.data.rows).toBeDefined();
+      expect(response.body.meta.sql).toContain('SELECT');
     });
 
-    it('returns 400 for missing connection', async () => {
+    it('returns 400 for missing question', async () => {
       const response = await request(app)
-        .post('/api/v1/query')
+        .post('/api/v1/ask')
         .send({
-          sql: 'SELECT 1',
+          connection: 'main',
         });
 
       expect(response.status).toBe(400);
@@ -124,11 +159,11 @@ describe('Query API', () => {
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('returns 400 for missing sql', async () => {
+    it('returns 400 for missing connection', async () => {
       const response = await request(app)
-        .post('/api/v1/query')
+        .post('/api/v1/ask')
         .send({
-          connection: 'main',
+          question: 'How many users?',
         });
 
       expect(response.status).toBe(400);
@@ -137,28 +172,36 @@ describe('Query API', () => {
 
     it('returns 404 for unknown connection', async () => {
       const response = await request(app)
-        .post('/api/v1/query')
+        .post('/api/v1/ask')
         .send({
+          question: 'How many users?',
           connection: 'unknown',
-          sql: 'SELECT 1',
         });
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('CONNECTION_NOT_FOUND');
     });
 
-    it('rejects non-SELECT queries', async () => {
+    it('includes explanation in response', async () => {
       const response = await request(app)
-        .post('/api/v1/query')
+        .post('/api/v1/ask')
         .send({
+          question: 'How many users are there?',
           connection: 'main',
-          sql: 'DELETE FROM users',
         });
 
-      expect(response.status).toBe(400);
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('INVALID_QUERY');
+      expect(response.body.meta.explanation).toBeDefined();
+    });
+
+    it('includes confidence score', async () => {
+      const response = await request(app)
+        .post('/api/v1/ask')
+        .send({
+          question: 'How many users?',
+          connection: 'main',
+        });
+
+      expect(response.body.meta.confidence).toBeGreaterThan(0);
     });
   });
 });
