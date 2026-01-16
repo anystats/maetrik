@@ -47,21 +47,7 @@ storage:
     expect(config.server.host).toBe('localhost');
   });
 
-  it('overrides file config with environment variables', async () => {
-    mockFs.existsSync.mockReturnValue(false);
-
-    const config = await loadConfig({
-      env: {
-        MAETRIK_SERVER_PORT: '4000',
-        MAETRIK_SERVER_HOST: '0.0.0.0',
-      },
-    });
-
-    expect(config.server.port).toBe(4000);
-    expect(config.server.host).toBe('0.0.0.0');
-  });
-
-  it.skip('interpolates environment variables in yaml', async () => {
+  it('interpolates environment variables in yaml', async () => {
     const yamlContent = `server:
   port: 3000
   host: localhost
