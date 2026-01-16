@@ -3,11 +3,11 @@ import {
   createLogger,
   type DatabaseDriver,
   type DriverCapabilities,
+  type DriverFactory,
   type SchemaDefinition,
   type QueryResult,
   type ConnectionConfig,
 } from '@maetrik/shared';
-import type { DriverFactory } from '../types.js';
 
 const { Client } = pg;
 
@@ -201,7 +201,7 @@ export function createPostgresDriver(): DatabaseDriver {
   };
 }
 
-export const postgresDriverFactory: DriverFactory = {
+export const driverFactory: DriverFactory = {
   name: 'postgres',
   dialect: 'postgresql',
   create: createPostgresDriver,

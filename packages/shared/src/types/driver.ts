@@ -53,3 +53,9 @@ export interface LLMDriver {
   };
 }
 
+export interface DriverFactory {
+  readonly name: string;
+  readonly dialect: string;
+  create(): DatabaseDriver;
+}
+

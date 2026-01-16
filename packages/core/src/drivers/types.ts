@@ -1,10 +1,6 @@
-import type { DatabaseDriver, ConnectionConfig } from '@maetrik/shared';
+import type { ConnectionConfig, DatabaseDriver, DriverFactory } from '@maetrik/shared';
 
-export interface DriverFactory {
-  readonly name: string;
-  readonly dialect: string;
-  create(): DatabaseDriver;
-}
+export type { DriverFactory } from '@maetrik/shared';
 
 export interface DriverRegistry {
   register(factory: DriverFactory): void;

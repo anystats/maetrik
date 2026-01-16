@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createPostgresDriver, postgresDriverFactory } from './index.js';
+import { createPostgresDriver, driverFactory } from './index.js';
 import type { DatabaseDriver } from '@maetrik/shared';
 
 // Mock pg module
@@ -70,7 +70,7 @@ describe('PostgresDriver', () => {
   });
 
   it('factory creates driver instance', () => {
-    const factoryDriver = postgresDriverFactory.create();
+    const factoryDriver = driverFactory.create();
 
     expect(factoryDriver.name).toBe('postgres');
     expect(factoryDriver.dialect).toBe('postgresql');
