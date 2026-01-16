@@ -57,6 +57,9 @@ importers:
       '@maetrik/shared':
         specifier: workspace:*
         version: link:../shared
+      openai:
+        specifier: ^6.16.0
+        version: 6.16.0
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -1766,6 +1769,19 @@ packages:
     dependencies:
       mimic-fn: 4.0.0
     dev: true
+
+  /openai@6.16.0:
+    resolution: {integrity: sha512-fZ1uBqjFUjXzbGc35fFtYKEOxd20kd9fDpFeqWtsOZWiubY8CZ1NAlXHW3iathaFvqmNtCWMIsosCuyeI7Joxg==}
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+    dev: false
 
   /p-limit@5.0.0:
     resolution: {integrity: sha512-/Eaoq+QyLSiXQ4lyYV23f14mZRQcXnxfHrN0vCai+ak9G0pp9iEQukIIZq5NccEvwRB8PUnZT0KsOoDCINS1qQ==}

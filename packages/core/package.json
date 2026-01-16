@@ -25,7 +25,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@maetrik/shared": "workspace:*"
+    "@maetrik/shared": "workspace:*",
+    "openai": "^6.16.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
