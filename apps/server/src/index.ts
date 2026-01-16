@@ -1,4 +1,4 @@
-import { createApp } from './app.js';
+import { createApp, getAppContext } from './app.js';
 import { loadConfig, createLogger } from '@maetrik/shared';
 import {
   autodiscoverDrivers,
@@ -26,7 +26,13 @@ async function main() {
     connections: config.connections,
   });
 
-  const app = createApp({ connections: config.connections, driverManager });
+  const app = createApp({
+    connections: config.connections,
+    llm: config.llm,
+    driverManager,
+  });
+
+  const context = getAppContext(app);
 
   // Initialize all database connections
   try {
@@ -38,6 +44,27 @@ async function main() {
       error: error instanceof Error ? error.message : String(error),
     });
     // Continue without database - health checks will show unhealthy
+  }
+
+  // Initialize LLM
+  if (config.llm?.driver) {
+    try {
+      logger.info('Initializing LLM driver...', { driver: config.llm.driver, model: config.llm.model });
+      await context.llmManager.initialize({
+        driver: config.llm.driver,
+        model: config.llm.model,
+        baseUrl: config.llm.baseUrl,
+        apiKey: config.llm.apiKey,
+      });
+      logger.info('LLM driver initialized');
+    } catch (error) {
+      logger.error('Failed to initialize LLM driver', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Continue without LLM - ask endpoint will fail gracefully
+    }
+  } else {
+    logger.warn('No LLM configuration provided, /api/v1/ask endpoint will not work');
   }
 
   const { port, host } = config.server;
@@ -52,8 +79,25 @@ async function main() {
 
     server.close(async () => {
       logger.info('HTTP server closed');
-      await driverManager.shutdown();
-      logger.info('Database connections closed');
+
+      try {
+        await context.llmManager.shutdown();
+        logger.info('LLM driver closed');
+      } catch (error) {
+        logger.warn('Error shutting down LLM', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        await driverManager.shutdown();
+        logger.info('Database connections closed');
+      } catch (error) {
+        logger.warn('Error shutting down database', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       process.exit(0);
     });
   };
