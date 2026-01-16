@@ -1,9 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
+import type { DriverManager } from '@maetrik/core';
 
 describe('Server App', () => {
-  const app = createApp();
+  const driverManager: DriverManager = {
+    initialize: async () => {},
+    getDriver: () => undefined,
+    healthCheck: async () => false,
+    shutdown: async () => {},
+  };
+  const app = createApp({ driverManager });
 
   describe('GET /health', () => {
     it('returns 200 with status ok', async () => {
@@ -45,4 +52,3 @@ describe('Server App', () => {
     });
   });
 });
-

@@ -1,11 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import type { ConnectionConfig } from '@maetrik/shared';
-import {
-  createDriverRegistry,
-  createDriverManager,
-  postgresDriverFactory,
-  type DriverManager,
-} from '@maetrik/core';
+import type { DriverManager } from '@maetrik/core';
 import { createConnectionsRouter } from './routes/connections.js';
 import { createQueryRouter } from './routes/query.js';
 
@@ -13,22 +8,14 @@ const startTime = Date.now();
 
 export interface AppOptions {
   connections?: Record<string, ConnectionConfig>;
+  driverManager: DriverManager;
 }
 
-export function createApp(options: AppOptions = {}): express.Express {
+export function createApp(options: AppOptions): express.Express {
   const app = express();
-  const { connections = {} } = options;
-
-  // Setup driver registry and manager
-  const registry = createDriverRegistry();
-  registry.register(postgresDriverFactory);
-
-  const driverManager = createDriverManager(registry, { connections });
+  const { connections = {}, driverManager } = options;
 
   app.use(express.json());
-
-  // Store driver manager on app for access in routes
-  app.set('driverManager', driverManager);
 
   // Simple health check
   app.get('/health', (_req: Request, res: Response) => {
@@ -84,8 +71,4 @@ export function createApp(options: AppOptions = {}): express.Express {
   });
 
   return app;
-}
-
-export function getDriverManager(app: express.Express): DriverManager {
-  return app.get('driverManager') as DriverManager;
 }

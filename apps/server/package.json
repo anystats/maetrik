@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@maetrik/core": "workspace:^",
+    "@maetrik/driver-postgres": "workspace:*",
     "@maetrik/shared": "workspace:*",
     "express": "^4.18.0"
   },

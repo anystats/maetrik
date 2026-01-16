@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { DriverFactory } from '@maetrik/shared';
 
 // Mock fs/promises
@@ -7,16 +7,9 @@ vi.mock('node:fs/promises', () => ({
 }));
 
 describe('autodiscoverDrivers', () => {
-  let originalCwd: string;
-
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    originalCwd = process.cwd();
-  });
-
-  afterEach(() => {
-    process.chdir(originalCwd);
   });
 
   it('discovers @maetrik/driver-* packages', async () => {

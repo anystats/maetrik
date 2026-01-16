@@ -2,46 +2,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 import type { Express } from 'express';
-
-// Mock the driver manager
-vi.mock('@maetrik/core', () => ({
-  createDriverRegistry: vi.fn(() => ({
-    register: vi.fn(),
-    get: vi.fn(),
-    list: vi.fn(() => ['postgres']),
-    createDriver: vi.fn(),
-  })),
-  createDriverManager: vi.fn(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    getDriver: vi.fn((name: string) => {
-      if (name === 'main') {
-        return {
-          name: 'postgres',
-          dialect: 'postgresql',
-          execute: vi.fn().mockResolvedValue({
-            columns: ['count'],
-            rows: [{ count: 42 }],
-            rowCount: 1,
-          }),
-        };
-      }
-      return undefined;
-    }),
-    healthCheck: vi.fn().mockResolvedValue(true),
-    shutdown: vi.fn().mockResolvedValue(undefined),
-  })),
-  postgresDriverFactory: {
-    name: 'postgres',
-    dialect: 'postgresql',
-    create: vi.fn(),
-  },
-}));
+import type { DriverManager } from '@maetrik/core';
 
 describe('Query API', () => {
   let app: Express;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    const driverManager: DriverManager = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getDriver: vi.fn((name: string) => {
+        if (name === 'main') {
+          return {
+            name: 'postgres',
+            dialect: 'postgresql',
+            execute: vi.fn().mockResolvedValue({
+              columns: ['count'],
+              rows: [{ count: 42 }],
+              rowCount: 1,
+            }),
+          };
+        }
+        return undefined;
+      }),
+      healthCheck: vi.fn().mockResolvedValue(true),
+      shutdown: vi.fn().mockResolvedValue(undefined),
+    };
     app = createApp({
       connections: {
         main: {
@@ -51,6 +37,7 @@ describe('Query API', () => {
           database: 'test',
         },
       },
+      driverManager,
     });
   });
 
