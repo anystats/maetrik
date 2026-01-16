@@ -1,9 +1,8 @@
 import * as fs from 'node:fs';
 import * as yaml from 'yaml';
-import { maetrikConfigSchema, MaetrikConfigInput } from './schema.js';
-import type { MaetrikConfig } from '../types/config.js';
+import { maetrikConfigSchema, type MaetrikConfigInput, type MaetrikConfig } from './schema.js';
 
-export type { MaetrikConfig } from '../types/config.js';
+export type { MaetrikConfig } from './schema.js';
 
 export interface LoadConfigOptions {
   configPath?: string;

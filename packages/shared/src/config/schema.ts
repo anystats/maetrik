@@ -46,5 +46,12 @@ export const maetrikConfigSchema = z.object({
   storage: storageConfigSchema.default({ driver: 'sqlite', path: './data/maetrik.db' }),
 });
 
+// Inferred types from Zod schemas - these are the source of truth
+export type ServerConfig = z.infer<typeof serverConfigSchema>;
+export type ConnectionConfig = z.infer<typeof connectionConfigSchema>;
+export type LLMConfig = z.infer<typeof llmConfigSchema>;
+export type AuthConfig = z.infer<typeof authConfigSchema>;
+export type StorageConfig = z.infer<typeof storageConfigSchema>;
+export type MaetrikConfig = z.infer<typeof maetrikConfigSchema>;
 export type MaetrikConfigInput = z.input<typeof maetrikConfigSchema>;
 
