@@ -1,6 +1,4 @@
 export * from './types.js';
-// Re-export from shared for backwards compatibility
-export { BaseDataSourceDriver } from '@maetrik/shared';
 export { createDataSourceRegistry } from './registry.js';
 export { createDataSourceManager } from './manager.js';
 export {
