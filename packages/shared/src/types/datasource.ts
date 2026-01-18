@@ -1,5 +1,3 @@
-import type { ZodSchema } from 'zod';
-
 // ============================================
 // Capability Interfaces
 // ============================================
@@ -85,6 +83,7 @@ export interface DataSourceFactory {
   readonly type: string;
   readonly displayName: string;
   readonly capabilities: DataSourceCapabilities;
-  readonly credentialsSchema: ZodSchema;
+  // Using unknown to support multiple zod versions
+  readonly credentialsSchema: unknown;
   create(): DataSourceDriver;
 }

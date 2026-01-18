@@ -6,6 +6,6 @@ export {
   autodiscoverDataSources,
   isValidDataSourceFactory,
   type DiscoveredDataSource,
-  type AutodiscoverResult,
+  type AutodiscoverResult as DataSourceAutodiscoverResult,
 } from './autodiscover.js';
 export { createDataSourceManagerFromConfig } from './from-config.js';

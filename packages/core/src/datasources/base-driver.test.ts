@@ -7,8 +7,8 @@ import type {
   Introspectable,
   HealthCheckable,
   Transactional,
-  QueryResult,
-  SchemaDefinition,
+  DataSourceQueryResult as QueryResult,
+  DataSourceSchemaDefinition as SchemaDefinition,
   Transaction,
 } from '@maetrik/shared';
 

@@ -16,10 +16,10 @@ const createMockDriver = (): DataSourceDriver => ({
     healthCheckable: true,
     transactional: false,
   }),
-  isQueryable: () => true,
-  isIntrospectable: () => false,
-  isHealthCheckable: () => true,
-  isTransactional: () => false,
+  isQueryable: (() => true) as DataSourceDriver['isQueryable'],
+  isIntrospectable: (() => false) as DataSourceDriver['isIntrospectable'],
+  isHealthCheckable: (() => true) as DataSourceDriver['isHealthCheckable'],
+  isTransactional: (() => false) as DataSourceDriver['isTransactional'],
 });
 
 const mockFactory: DataSourceFactory = {
