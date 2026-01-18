@@ -3,6 +3,7 @@ import * as yaml from 'yaml';
 import { maetrikConfigSchema, type MaetrikConfigInput, type MaetrikConfig } from './schema.js';
 
 export type { MaetrikConfig } from './schema.js';
+export { maetrikConfigSchema } from './schema.js';
 
 export interface LoadConfigOptions {
   configPath?: string;

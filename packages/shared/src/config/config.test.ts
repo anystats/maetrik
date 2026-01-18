@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { loadConfig, MaetrikConfig } from './index.js';
+import { loadConfig, MaetrikConfig, maetrikConfigSchema } from './index.js';
 import * as fs from 'node:fs';
 
 vi.mock('node:fs');
@@ -75,6 +75,32 @@ storage:
     });
 
     expect(config.connections.main.password).toBe('secret123');
+  });
+});
+
+describe('dataSourcesSchema', () => {
+  it('validates data source config array', () => {
+    const config = {
+      dataSources: [
+        {
+          id: '550e8400-e29b-41d4-a716-446655440001',
+          type: 'postgres',
+          credentials: {
+            host: 'localhost',
+            port: 5432,
+            database: 'mydb',
+          },
+        },
+      ],
+    };
+    const result = maetrikConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it('allows empty dataSources array', () => {
+    const config = { dataSources: [] };
+    const result = maetrikConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
   });
 });
 

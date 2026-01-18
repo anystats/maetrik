@@ -38,9 +38,16 @@ export const storageConfigSchema = z.object({
   connectionString: z.string().optional(),
 });
 
+export const dataSourceConfigSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  credentials: z.record(z.string(), z.any()),
+});
+
 export const maetrikConfigSchema = z.object({
   server: serverConfigSchema.default({ port: 3000, host: 'localhost' }),
   connections: z.record(z.string(), connectionConfigSchema).default({}),
+  dataSources: z.array(dataSourceConfigSchema).default([]),
   llm: llmConfigSchema.default({ driver: 'ollama', model: 'llama3' }),
   auth: authConfigSchema.default({ driver: 'none' }),
   storage: storageConfigSchema.default({ driver: 'sqlite', path: './data/maetrik.db' }),
@@ -49,6 +56,7 @@ export const maetrikConfigSchema = z.object({
 // Inferred types from Zod schemas - these are the source of truth
 export type ServerConfig = z.infer<typeof serverConfigSchema>;
 export type ConnectionConfig = z.infer<typeof connectionConfigSchema>;
+export type DataSourceConfigEntry = z.infer<typeof dataSourceConfigSchema>;
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 export type AuthConfig = z.infer<typeof authConfigSchema>;
 export type StorageConfig = z.infer<typeof storageConfigSchema>;
