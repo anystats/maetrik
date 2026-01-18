@@ -29,6 +29,9 @@ importers:
       express:
         specifier: ^4.18.0
         version: 4.22.1
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.5
     devDependencies:
       '@types/express':
         specifier: ^4.17.0

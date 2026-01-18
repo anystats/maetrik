@@ -1,5 +1,22 @@
 import { Router, Request, Response } from 'express';
 import type { DataSourceManager, StateDatabase } from '@maetrik/core';
+import { z } from 'zod';
+
+const createConnectionSchema = z.object({
+  id: z.string().min(1).max(100).regex(/^[a-z0-9-_]+$/i, 'ID must be alphanumeric with dashes/underscores'),
+  type: z.string().min(1),
+  credentials: z.record(z.string(), z.unknown()),
+  name: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const updateConnectionSchema = z.object({
+  credentials: z.record(z.string(), z.unknown()).optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+}).refine(data => Object.keys(data).length > 0, {
+  message: 'At least one field must be provided',
+});
 
 export interface ConnectionsRouterOptions {
   dataSourceManager: DataSourceManager;
