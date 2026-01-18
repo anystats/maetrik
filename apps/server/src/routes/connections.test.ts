@@ -1,39 +1,44 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 import type { Express } from 'express';
 import type { DataSourceManager, DataSourceDriver } from '@maetrik/core';
+import { PGLiteStateDatabase } from '@maetrik/core';
 
-// Mock core modules
-vi.mock('@maetrik/core', () => ({
-  createLLMRegistry: vi.fn(() => ({
-    register: vi.fn(),
-    get: vi.fn(),
-    list: vi.fn(() => ['ollama']),
-    createDriver: vi.fn(),
-  })),
-  createLLMManager: vi.fn(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    getDriver: vi.fn(() => ({ name: 'ollama' })),
-    complete: vi.fn().mockResolvedValue({ content: '' }),
-    shutdown: vi.fn().mockResolvedValue(undefined),
-  })),
-  ollamaDriverFactory: { name: 'ollama', create: vi.fn() },
-  openaiDriverFactory: { name: 'openai', create: vi.fn() },
-  createQueryTranslator: vi.fn(() => ({
-    translate: vi.fn().mockResolvedValue({
-      sql: 'SELECT 1',
-      explanation: 'Test',
-      confidence: 1,
-      suggestedTables: [],
-    }),
-  })),
-  createSemanticLayer: vi.fn(() => ({
-    getSchema: vi.fn().mockReturnValue({ tables: {} }),
-    toSchemaDefinition: vi.fn().mockReturnValue({ tables: {} }),
-    inferRelationships: vi.fn(),
-  })),
-}));
+// Mock core modules (but not PGLiteStateDatabase)
+vi.mock('@maetrik/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@maetrik/core')>();
+  return {
+    ...actual,
+    createLLMRegistry: vi.fn(() => ({
+      register: vi.fn(),
+      get: vi.fn(),
+      list: vi.fn(() => ['ollama']),
+      createDriver: vi.fn(),
+    })),
+    createLLMManager: vi.fn(() => ({
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getDriver: vi.fn(() => ({ name: 'ollama' })),
+      complete: vi.fn().mockResolvedValue({ content: '' }),
+      shutdown: vi.fn().mockResolvedValue(undefined),
+    })),
+    ollamaDriverFactory: { name: 'ollama', create: vi.fn() },
+    openaiDriverFactory: { name: 'openai', create: vi.fn() },
+    createQueryTranslator: vi.fn(() => ({
+      translate: vi.fn().mockResolvedValue({
+        sql: 'SELECT 1',
+        explanation: 'Test',
+        confidence: 1,
+        suggestedTables: [],
+      }),
+    })),
+    createSemanticLayer: vi.fn(() => ({
+      getSchema: vi.fn().mockReturnValue({ tables: {} }),
+      toSchemaDefinition: vi.fn().mockReturnValue({ tables: {} }),
+      inferRelationships: vi.fn(),
+    })),
+  };
+});
 
 const createMockDataSource = (): DataSourceDriver => ({
   name: 'main',
@@ -72,12 +77,13 @@ const createMockDataSource = (): DataSourceDriver => ({
 describe('Connections API', () => {
   let app: Express;
   let mockDataSource: ReturnType<typeof createMockDataSource>;
+  let mockDataSourceManager: DataSourceManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockDataSource = createMockDataSource();
 
-    const mockDataSourceManager: DataSourceManager = {
+    mockDataSourceManager = {
       getConfig: vi.fn((id: string) =>
         id === 'main'
           ? Promise.resolve({ id: 'main', type: 'postgres', credentials: {} })
@@ -146,6 +152,88 @@ describe('Connections API', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.tables).toHaveLength(1);
       expect(response.body.data.tables[0].name).toBe('users');
+    });
+  });
+
+  describe('POST /api/v1/connections', () => {
+    let stateDb: PGLiteStateDatabase;
+
+    beforeEach(async () => {
+      stateDb = new PGLiteStateDatabase('memory://connections-test-create');
+      await stateDb.initialize();
+      await stateDb.execute('DELETE FROM connections');
+    });
+
+    afterEach(async () => {
+      await stateDb.shutdown();
+    });
+
+    it('creates a new connection', async () => {
+      const appWithDb = createApp({
+        dataSourceManager: mockDataSourceManager,
+        stateDb,
+      });
+
+      const response = await request(appWithDb)
+        .post('/api/v1/connections')
+        .send({
+          id: 'new-db',
+          type: 'postgres',
+          credentials: { host: 'localhost', port: 5432 },
+          name: 'New Database',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.id).toBe('new-db');
+    });
+
+    it('returns 400 for invalid input', async () => {
+      const appWithDb = createApp({
+        dataSourceManager: mockDataSourceManager,
+        stateDb,
+      });
+
+      const response = await request(appWithDb)
+        .post('/api/v1/connections')
+        .send({ id: '' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('returns 409 when connection exists in file config', async () => {
+      const appWithDb = createApp({
+        dataSourceManager: {
+          ...mockDataSourceManager,
+          canAddToDatabase: vi.fn().mockResolvedValue(false),
+        },
+        stateDb,
+      });
+
+      const response = await request(appWithDb)
+        .post('/api/v1/connections')
+        .send({
+          id: 'main',
+          type: 'postgres',
+          credentials: {},
+        });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe('CONNECTION_EXISTS');
+    });
+
+    it('returns 501 when stateDb not configured', async () => {
+      const response = await request(app)
+        .post('/api/v1/connections')
+        .send({
+          id: 'new-db',
+          type: 'postgres',
+          credentials: {},
+        });
+
+      expect(response.status).toBe(501);
+      expect(response.body.error.code).toBe('NOT_IMPLEMENTED');
     });
   });
 });

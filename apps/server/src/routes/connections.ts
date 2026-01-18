@@ -173,5 +173,70 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
     }
   });
 
+  // POST /api/v1/connections - Create a new connection
+  router.post('/', async (req: Request, res: Response) => {
+    if (!options.stateDb) {
+      res.status(501).json({
+        success: false,
+        error: {
+          code: 'NOT_IMPLEMENTED',
+          message: 'Connection management requires a state database',
+        },
+      });
+      return;
+    }
+
+    const parsed = createConnectionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const flattened = parsed.error.flatten();
+      const firstFieldError = Object.values(flattened.fieldErrors)[0];
+      const message = firstFieldError?.[0] ?? flattened.formErrors[0] ?? 'Validation failed';
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message,
+          details: flattened,
+        },
+      });
+      return;
+    }
+
+    const { id, type, credentials, name, description } = parsed.data;
+
+    // Check if ID exists in file config (can't override)
+    const canAdd = await dataSourceManager.canAddToDatabase(id);
+    if (!canAdd) {
+      res.status(409).json({
+        success: false,
+        error: {
+          code: 'CONNECTION_EXISTS',
+          message: `Connection '${id}' already exists in file configuration`,
+        },
+      });
+      return;
+    }
+
+    // Check if already exists in database
+    const exists = await options.stateDb.connectionExists(id);
+    if (exists) {
+      res.status(409).json({
+        success: false,
+        error: {
+          code: 'CONNECTION_EXISTS',
+          message: `Connection '${id}' already exists`,
+        },
+      });
+      return;
+    }
+
+    await options.stateDb.createConnection({ id, type, credentials, name, description });
+
+    res.status(201).json({
+      success: true,
+      data: { id, type, name, description },
+    });
+  });
+
   return router;
 }

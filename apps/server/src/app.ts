@@ -79,10 +79,10 @@ export function createApp(options: AppOptions): express.Express {
     });
   });
 
-  // Connections API (uses data source manager)
+  // Connections API (uses data source manager and state database)
   app.use(
     '/api/v1/connections',
-    createConnectionsRouter({ dataSourceManager })
+    createConnectionsRouter({ dataSourceManager, stateDb: options.stateDb })
   );
 
   // Query API (raw SQL)
