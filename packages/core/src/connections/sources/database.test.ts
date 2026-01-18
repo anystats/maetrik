@@ -7,7 +7,8 @@ describe('DatabaseConnectionConfigSource', () => {
   let source: DatabaseConnectionConfigSource;
 
   beforeEach(async () => {
-    db = new PGLiteStateDatabase(':memory:');
+    // Use unique memory path to avoid sharing state with parallel tests
+    db = new PGLiteStateDatabase('memory://database-source-test');
     await db.initialize();
     // Clean up for test isolation
     await db.execute('DELETE FROM connections');

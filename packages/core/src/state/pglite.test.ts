@@ -5,7 +5,8 @@ describe('PGLiteStateDatabase', () => {
   let db: PGLiteStateDatabase;
 
   beforeEach(async () => {
-    db = new PGLiteStateDatabase(':memory:');
+    // Use unique memory path to avoid sharing state with parallel tests
+    db = new PGLiteStateDatabase('memory://pglite-test');
     await db.initialize();
   });
 
