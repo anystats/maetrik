@@ -1,5 +1,10 @@
 import { PGlite } from '@electric-sql/pglite';
-import type { StateDatabase } from './types.js';
+import type {
+  StateDatabase,
+  ConnectionRow,
+  CreateConnectionInput,
+  UpdateConnectionInput,
+} from './types.js';
 
 export class PGLiteStateDatabase implements StateDatabase {
   private db: PGlite | null = null;
@@ -12,6 +17,18 @@ export class PGLiteStateDatabase implements StateDatabase {
   async initialize(): Promise<void> {
     this.db = new PGlite(this.path);
     await this.db.waitReady;
+
+    await this.db.exec(`
+      CREATE TABLE IF NOT EXISTS connections (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        credentials JSONB NOT NULL,
+        name TEXT,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
   }
 
   async query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]> {
@@ -35,5 +52,77 @@ export class PGLiteStateDatabase implements StateDatabase {
       await this.db.close();
       this.db = null;
     }
+  }
+
+  async createConnection(input: CreateConnectionInput): Promise<void> {
+    if (!this.db) throw new Error('State database not initialized');
+    await this.db.query(
+      `INSERT INTO connections (id, type, credentials, name, description)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        input.id,
+        input.type,
+        JSON.stringify(input.credentials),
+        input.name ?? null,
+        input.description ?? null,
+      ]
+    );
+  }
+
+  async getConnection(id: string): Promise<ConnectionRow | undefined> {
+    if (!this.db) throw new Error('State database not initialized');
+    const result = await this.db.query<ConnectionRow>(
+      'SELECT id, type, credentials, name, description, created_at, updated_at FROM connections WHERE id = $1',
+      [id]
+    );
+    return result.rows[0];
+  }
+
+  async listConnections(): Promise<ConnectionRow[]> {
+    if (!this.db) throw new Error('State database not initialized');
+    const result = await this.db.query<ConnectionRow>(
+      'SELECT id, type, credentials, name, description, created_at, updated_at FROM connections ORDER BY created_at'
+    );
+    return result.rows;
+  }
+
+  async connectionExists(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('State database not initialized');
+    const result = await this.db.query<{ count: string }>(
+      'SELECT COUNT(*) as count FROM connections WHERE id = $1',
+      [id]
+    );
+    return parseInt(result.rows[0].count, 10) > 0;
+  }
+
+  async updateConnection(id: string, input: UpdateConnectionInput): Promise<void> {
+    if (!this.db) throw new Error('State database not initialized');
+    const sets: string[] = ['updated_at = CURRENT_TIMESTAMP'];
+    const params: unknown[] = [];
+    let paramIndex = 1;
+
+    if (input.credentials !== undefined) {
+      sets.push(`credentials = $${paramIndex++}`);
+      params.push(JSON.stringify(input.credentials));
+    }
+    if (input.name !== undefined) {
+      sets.push(`name = $${paramIndex++}`);
+      params.push(input.name);
+    }
+    if (input.description !== undefined) {
+      sets.push(`description = $${paramIndex++}`);
+      params.push(input.description);
+    }
+
+    params.push(id);
+    await this.db.query(
+      `UPDATE connections SET ${sets.join(', ')} WHERE id = $${paramIndex}`,
+      params
+    );
+  }
+
+  async deleteConnection(id: string): Promise<void> {
+    if (!this.db) throw new Error('State database not initialized');
+    await this.db.query('DELETE FROM connections WHERE id = $1', [id]);
   }
 }
