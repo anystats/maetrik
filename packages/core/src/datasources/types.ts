@@ -1,4 +1,5 @@
 import type { DataSourceFactory, DataSourceDriver, DataSourceConfig } from '@maetrik/shared';
+import type { ConnectionConfigResolver } from '../connections/types.js';
 
 export interface DataSourceRegistry {
   register(factory: DataSourceFactory): void;
@@ -8,17 +9,22 @@ export interface DataSourceRegistry {
 }
 
 export interface DataSourceManager {
-  addConfig(config: DataSourceConfig): void;
-  removeConfig(id: string): void;
-  getConfig(id: string): DataSourceConfig | undefined;
-  listConfigs(): DataSourceConfig[];
-  get(id: string): Promise<DataSourceDriver | undefined>;
-  shutdown(): Promise<void>;
+  // Config access (delegated to resolver)
+  getConfig(id: string): Promise<DataSourceConfig>;
+  listConfigs(): Promise<DataSourceConfig[]>;
+  hasConnection(id: string): Promise<boolean>;
+
+  // Driver instantiation (stateless - caller manages lifecycle)
+  connect(config: DataSourceConfig): Promise<DataSourceDriver>;
+  connectById(id: string): Promise<DataSourceDriver>;
+
+  // For API validation
+  canAddToDatabase(id: string): Promise<boolean>;
 }
 
 export interface DataSourceManagerOptions {
   registry: DataSourceRegistry;
-  configs?: DataSourceConfig[];
+  resolver: ConnectionConfigResolver;
   logger?: {
     info: (msg: string) => void;
     warn: (msg: string) => void;

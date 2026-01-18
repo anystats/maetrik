@@ -1,77 +1,43 @@
 import type { DataSourceDriver, DataSourceConfig } from '@maetrik/shared';
 import type { DataSourceManager, DataSourceManagerOptions } from './types.js';
+import { DriverNotFoundError } from '../connections/errors.js';
 
 export function createDataSourceManager(options: DataSourceManagerOptions): DataSourceManager {
-  const { registry, configs = [], logger } = options;
-  const configMap = new Map<string, DataSourceConfig>();
-  const instances = new Map<string, DataSourceDriver>();
-
-  // Initialize with provided configs
-  for (const config of configs) {
-    configMap.set(config.id, config);
-  }
+  const { registry, resolver, logger } = options;
 
   return {
-    addConfig(config: DataSourceConfig): void {
-      configMap.set(config.id, config);
-      logger?.info(`Added data source config: ${config.id} (${config.type})`);
+    async getConfig(id: string): Promise<DataSourceConfig> {
+      return resolver.get(id);
     },
 
-    removeConfig(id: string): void {
-      configMap.delete(id);
-      // Note: does not shutdown existing instance - caller should handle if needed
-      logger?.info(`Removed data source config: ${id}`);
+    async listConfigs(): Promise<DataSourceConfig[]> {
+      return resolver.list();
     },
 
-    getConfig(id: string): DataSourceConfig | undefined {
-      return configMap.get(id);
+    async hasConnection(id: string): Promise<boolean> {
+      return resolver.has(id);
     },
 
-    listConfigs(): DataSourceConfig[] {
-      return Array.from(configMap.values());
-    },
-
-    async get(id: string): Promise<DataSourceDriver | undefined> {
-      // Return existing instance if already connected
-      if (instances.has(id)) {
-        return instances.get(id);
-      }
-
-      // Get config
-      const config = configMap.get(id);
-      if (!config) {
-        logger?.warn(`No config found for data source: ${id}`);
-        return undefined;
-      }
-
-      // Get factory
+    async connect(config: DataSourceConfig): Promise<DataSourceDriver> {
       const factory = registry.get(config.type);
       if (!factory) {
-        logger?.warn(`No factory found for data source type: ${config.type}`);
-        return undefined;
+        throw new DriverNotFoundError(config.type);
       }
 
-      // Lazy instantiation
-      logger?.info(`Creating data source instance: ${id} (${config.type})`);
       const driver = factory.create();
       await driver.init(config);
-      instances.set(id, driver);
 
+      logger?.info(`Connected to ${config.id} (${config.type})`);
       return driver;
     },
 
-    async shutdown(): Promise<void> {
-      const shutdownPromises = Array.from(instances.entries()).map(async ([id, driver]) => {
-        try {
-          logger?.info(`Shutting down data source: ${id}`);
-          await driver.shutdown();
-        } catch (error) {
-          logger?.error(`Error shutting down data source ${id}: ${error}`);
-        }
-      });
+    async connectById(id: string): Promise<DataSourceDriver> {
+      const config = await resolver.get(id);
+      return this.connect(config);
+    },
 
-      await Promise.all(shutdownPromises);
-      instances.clear();
+    async canAddToDatabase(id: string): Promise<boolean> {
+      return !(await resolver.existsInOtherSources(id, 'database'));
     },
   };
 }

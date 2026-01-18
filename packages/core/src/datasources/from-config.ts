@@ -1,8 +1,11 @@
 import type { DataSourceConfig } from '@maetrik/shared';
+import type { StateDatabase } from '../state/types.js';
 import type { DataSourceManager } from './types.js';
 import { createDataSourceRegistry } from './registry.js';
 import { createDataSourceManager } from './manager.js';
 import { autodiscoverDataSources } from './autodiscover.js';
+import { FileConnectionConfigSource, DatabaseConnectionConfigSource } from '../connections/sources/index.js';
+import { CompositeConnectionConfigResolver } from '../connections/resolver.js';
 
 interface Logger {
   info: (msg: string) => void;
@@ -10,10 +13,17 @@ interface Logger {
   error: (msg: string) => void;
 }
 
+export interface CreateDataSourceManagerOptions {
+  fileConfigs?: DataSourceConfig[];
+  stateDb?: StateDatabase;
+  logger?: Logger;
+}
+
 export async function createDataSourceManagerFromConfig(
-  configs: DataSourceConfig[],
-  logger?: Logger
+  options: CreateDataSourceManagerOptions
 ): Promise<DataSourceManager> {
+  const { fileConfigs = [], stateDb, logger } = options;
+
   // Create registry
   const registry = createDataSourceRegistry();
 
@@ -35,12 +45,24 @@ export async function createDataSourceManagerFromConfig(
     }
   }
 
-  // Create manager with configs
-  const manager = createDataSourceManager({
+  // Create config sources
+  const sources = [];
+  sources.push(new FileConnectionConfigSource(fileConfigs));
+
+  if (stateDb) {
+    sources.push(new DatabaseConnectionConfigSource(stateDb));
+  }
+
+  // Create resolver
+  const resolver = new CompositeConnectionConfigResolver(sources);
+
+  // Validate no duplicates on startup
+  await resolver.list();
+
+  // Create manager
+  return createDataSourceManager({
     registry,
-    configs,
+    resolver,
     logger,
   });
-
-  return manager;
 }

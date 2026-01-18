@@ -25,18 +25,23 @@ describe('createDataSourceManagerFromConfig', () => {
       { id: 'test-1', type: 'postgres', credentials: { host: 'localhost' } },
     ];
 
-    const manager = await createDataSourceManagerFromConfig(configs, mockLogger);
+    const manager = await createDataSourceManagerFromConfig({
+      fileConfigs: configs,
+      logger: mockLogger,
+    });
 
     expect(manager).toBeDefined();
-    expect(manager.listConfigs()).toHaveLength(1);
-    expect(manager.getConfig('test-1')).toEqual(configs[0]);
+    expect(await manager.listConfigs()).toHaveLength(1);
+    expect(await manager.getConfig('test-1')).toEqual(configs[0]);
   });
 
   it('creates a manager with empty configs', async () => {
-    const manager = await createDataSourceManagerFromConfig([], mockLogger);
+    const manager = await createDataSourceManagerFromConfig({
+      logger: mockLogger,
+    });
 
     expect(manager).toBeDefined();
-    expect(manager.listConfigs()).toHaveLength(0);
+    expect(await manager.listConfigs()).toHaveLength(0);
   });
 
   it('logs discovery errors as warnings', async () => {
@@ -46,7 +51,7 @@ describe('createDataSourceManagerFromConfig', () => {
       errors: [{ packageName: 'bad-package', error: 'Import failed' }],
     });
 
-    await createDataSourceManagerFromConfig([], mockLogger);
+    await createDataSourceManagerFromConfig({ logger: mockLogger });
 
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('bad-package')

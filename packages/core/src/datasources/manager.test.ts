@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createDataSourceManager } from './manager.js';
 import { createDataSourceRegistry } from './registry.js';
+import { CompositeConnectionConfigResolver } from '../connections/resolver.js';
+import { FileConnectionConfigSource } from '../connections/sources/file.js';
+import { ConnectionNotFoundError, DriverNotFoundError } from '../connections/errors.js';
 import type { DataSourceManager, DataSourceRegistry } from './types.js';
 import type { DataSourceFactory, DataSourceDriver, DataSourceConfig } from '@maetrik/shared';
 import { z } from 'zod';
@@ -35,11 +38,10 @@ const mockFactory: DataSourceFactory = {
   create: vi.fn().mockImplementation(createMockDriver),
 };
 
-const testConfig: DataSourceConfig = {
-  id: 'test-id-123',
-  type: 'mock',
-  credentials: { host: 'localhost' },
-};
+const testConfigs: DataSourceConfig[] = [
+  { id: 'test-id-123', type: 'mock', credentials: { host: 'localhost' } },
+  { id: 'second-id', type: 'mock', credentials: { host: 'remote' } },
+];
 
 describe('DataSourceManager', () => {
   let registry: DataSourceRegistry;
@@ -49,80 +51,79 @@ describe('DataSourceManager', () => {
     vi.clearAllMocks();
     registry = createDataSourceRegistry();
     registry.register(mockFactory);
-    manager = createDataSourceManager({ registry });
+
+    const fileSource = new FileConnectionConfigSource(testConfigs);
+    const resolver = new CompositeConnectionConfigResolver([fileSource]);
+
+    manager = createDataSourceManager({ registry, resolver });
   });
 
-  describe('config management', () => {
-    it('addConfig adds a configuration', () => {
-      manager.addConfig(testConfig);
-      expect(manager.getConfig('test-id-123')).toEqual(testConfig);
+  describe('config access', () => {
+    it('getConfig returns config by id', async () => {
+      const config = await manager.getConfig('test-id-123');
+      expect(config).toEqual(testConfigs[0]);
     });
 
-    it('removeConfig removes a configuration', () => {
-      manager.addConfig(testConfig);
-      manager.removeConfig('test-id-123');
-      expect(manager.getConfig('test-id-123')).toBeUndefined();
+    it('getConfig throws ConnectionNotFoundError for unknown id', async () => {
+      await expect(manager.getConfig('unknown')).rejects.toThrow(ConnectionNotFoundError);
     });
 
-    it('listConfigs returns all configurations', () => {
-      manager.addConfig(testConfig);
-      manager.addConfig({ ...testConfig, id: 'second-id' });
-      expect(manager.listConfigs()).toHaveLength(2);
+    it('listConfigs returns all configurations', async () => {
+      const configs = await manager.listConfigs();
+      expect(configs).toHaveLength(2);
+    });
+
+    it('hasConnection returns true for existing id', async () => {
+      expect(await manager.hasConnection('test-id-123')).toBe(true);
+    });
+
+    it('hasConnection returns false for unknown id', async () => {
+      expect(await manager.hasConnection('unknown')).toBe(false);
     });
   });
 
-  describe('lazy instantiation', () => {
-    it('does not create driver until get() is called', async () => {
-      manager.addConfig(testConfig);
-      expect(mockFactory.create).not.toHaveBeenCalled();
-    });
-
-    it('creates and initializes driver on first get()', async () => {
-      manager.addConfig(testConfig);
-      const driver = await manager.get('test-id-123');
+  describe('connect', () => {
+    it('creates and initializes driver from config', async () => {
+      const driver = await manager.connect(testConfigs[0]);
 
       expect(mockFactory.create).toHaveBeenCalledTimes(1);
-      expect(driver).toBeDefined();
-      expect(driver!.init).toHaveBeenCalledWith(testConfig);
+      expect(driver.init).toHaveBeenCalledWith(testConfigs[0]);
     });
 
-    it('returns same instance on subsequent get() calls', async () => {
-      manager.addConfig(testConfig);
-      const driver1 = await manager.get('test-id-123');
-      const driver2 = await manager.get('test-id-123');
+    it('returns new instance each time (stateless)', async () => {
+      const driver1 = await manager.connect(testConfigs[0]);
+      const driver2 = await manager.connect(testConfigs[0]);
 
-      expect(driver1).toBe(driver2);
-      expect(mockFactory.create).toHaveBeenCalledTimes(1);
+      expect(driver1).not.toBe(driver2);
+      expect(mockFactory.create).toHaveBeenCalledTimes(2);
     });
 
-    it('returns undefined for unknown id', async () => {
-      const driver = await manager.get('unknown-id');
-      expect(driver).toBeUndefined();
-    });
-
-    it('returns undefined for unknown driver type', async () => {
-      manager.addConfig({ ...testConfig, type: 'unknown-type' });
-      const driver = await manager.get('test-id-123');
-      expect(driver).toBeUndefined();
+    it('throws DriverNotFoundError for unknown type', async () => {
+      const unknownConfig = { id: 'x', type: 'unknown', credentials: {} };
+      await expect(manager.connect(unknownConfig)).rejects.toThrow(DriverNotFoundError);
     });
   });
 
-  describe('shutdown', () => {
-    it('shuts down all instantiated drivers', async () => {
-      manager.addConfig(testConfig);
-      manager.addConfig({ ...testConfig, id: 'second-id' });
+  describe('connectById', () => {
+    it('resolves config and connects', async () => {
+      const driver = await manager.connectById('test-id-123');
 
-      const driver1 = await manager.get('test-id-123');
-      const driver2 = await manager.get('second-id');
-
-      await manager.shutdown();
-
-      expect(driver1!.shutdown).toHaveBeenCalled();
-      expect(driver2!.shutdown).toHaveBeenCalled();
+      expect(mockFactory.create).toHaveBeenCalledTimes(1);
+      expect(driver.init).toHaveBeenCalledWith(testConfigs[0]);
     });
 
-    it('does not fail if no drivers instantiated', async () => {
-      await expect(manager.shutdown()).resolves.not.toThrow();
+    it('throws ConnectionNotFoundError for unknown id', async () => {
+      await expect(manager.connectById('unknown')).rejects.toThrow(ConnectionNotFoundError);
+    });
+  });
+
+  describe('canAddToDatabase', () => {
+    it('returns false when id exists in file source', async () => {
+      expect(await manager.canAddToDatabase('test-id-123')).toBe(false);
+    });
+
+    it('returns true when id does not exist', async () => {
+      expect(await manager.canAddToDatabase('new-id')).toBe(true);
     });
   });
 });
