@@ -87,7 +87,7 @@ function convertSchemaFormat(arraySchema: ArraySchema): RecordSchema {
 
 export function createAskRouter(options: AskRouterOptions): Router {
   const router = Router();
-  const { dataSourceManager, llmManager, queryTranslator, semanticLayers } = options;
+  const { dataSourceManager, queryTranslator, semanticLayers } = options;
 
   router.post('/', async (req: Request, res: Response) => {
     const { question, connection } = req.body;
@@ -115,9 +115,8 @@ export function createAskRouter(options: AskRouterOptions): Router {
       return;
     }
 
-    // Get data source
-    const dataSource = await dataSourceManager.get(connection);
-    if (!dataSource) {
+    // Check connection exists first (without creating driver)
+    if (!(await dataSourceManager.hasConnection(connection))) {
       res.status(404).json({
         success: false,
         error: {
@@ -128,39 +127,51 @@ export function createAskRouter(options: AskRouterOptions): Router {
       return;
     }
 
-    // Check capabilities
-    if (!dataSource.isQueryable()) {
-      res.status(400).json({
+    let dataSource;
+    try {
+      dataSource = await dataSourceManager.connectById(connection);
+    } catch (error) {
+      res.status(500).json({
         success: false,
         error: {
-          code: 'NOT_SUPPORTED',
-          message: 'This data source does not support queries',
-        },
-      });
-      return;
-    }
-
-    if (!dataSource.isIntrospectable()) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 'NOT_SUPPORTED',
-          message: 'This data source does not support schema introspection',
+          code: 'CONNECTION_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to connect',
         },
       });
       return;
     }
 
     try {
+      // Check capabilities
+      if (!dataSource.isQueryable()) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NOT_SUPPORTED',
+            message: 'This data source does not support queries',
+          },
+        });
+        return;
+      }
+
+      if (!dataSource.isIntrospectable()) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NOT_SUPPORTED',
+            message: 'This data source does not support schema introspection',
+          },
+        });
+        return;
+      }
+
       const startTime = Date.now();
 
       // Get schema (from semantic layer if available, otherwise introspect)
       let semanticLayer = semanticLayers.get(connection);
       if (!semanticLayer) {
-        // Import dynamically to avoid circular dependencies in tests
         const { createSemanticLayer } = await import('@maetrik/core');
         const rawSchema = await dataSource.introspect();
-        // Convert array-based schema to record-based schema expected by semantic layer
         const convertedSchema = convertSchemaFormat(rawSchema as ArraySchema);
         semanticLayer = createSemanticLayer(convertedSchema);
         semanticLayer.inferRelationships();
@@ -196,7 +207,7 @@ export function createAskRouter(options: AskRouterOptions): Router {
       res.json({
         success: true,
         data: {
-          columns: result.fields.map((f) => f.name),
+          columns: result.fields.map((f: { name: string }) => f.name),
           rows: result.rows,
           rowCount: result.rowCount,
         },
@@ -217,6 +228,9 @@ export function createAskRouter(options: AskRouterOptions): Router {
           message: error instanceof Error ? error.message : 'Failed to process question',
         },
       });
+    } finally {
+      // Always shutdown the driver
+      await dataSource.shutdown();
     }
   });
 

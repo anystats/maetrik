@@ -10,8 +10,8 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
   const { dataSourceManager } = options;
 
   // GET /api/v1/connections - List all data sources (connections)
-  router.get('/', (_req: Request, res: Response) => {
-    const configs = dataSourceManager.listConfigs();
+  router.get('/', async (_req: Request, res: Response) => {
+    const configs = await dataSourceManager.listConfigs();
     const connectionList = configs.map((config) => ({
       name: config.id,
       type: config.type,
@@ -24,11 +24,19 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
   });
 
   // GET /api/v1/connections/:name - Get connection details
-  router.get('/:name', (req: Request, res: Response) => {
+  router.get('/:name', async (req: Request, res: Response) => {
     const { name } = req.params;
-    const config = dataSourceManager.getConfig(name);
 
-    if (!config) {
+    try {
+      const config = await dataSourceManager.getConfig(name);
+      res.json({
+        success: true,
+        data: {
+          name: config.id,
+          type: config.type,
+        },
+      });
+    } catch {
       res.status(404).json({
         success: false,
         error: {
@@ -36,24 +44,14 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
           message: `Connection '${name}' not found`,
         },
       });
-      return;
     }
-
-    res.json({
-      success: true,
-      data: {
-        name: config.id,
-        type: config.type,
-      },
-    });
   });
 
   // GET /api/v1/connections/:name/health - Check connection health
   router.get('/:name/health', async (req: Request, res: Response) => {
     const { name } = req.params;
-    const config = dataSourceManager.getConfig(name);
 
-    if (!config) {
+    if (!(await dataSourceManager.hasConnection(name))) {
       res.status(404).json({
         success: false,
         error: {
@@ -64,16 +62,18 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       return;
     }
 
+    let dataSource;
     try {
-      const dataSource = await dataSourceManager.get(name);
-      if (!dataSource) {
-        res.json({
-          success: true,
-          data: { healthy: false },
-        });
-        return;
-      }
+      dataSource = await dataSourceManager.connectById(name);
+    } catch {
+      res.json({
+        success: true,
+        data: { healthy: false },
+      });
+      return;
+    }
 
+    try {
       if (dataSource.isHealthCheckable()) {
         const healthy = await dataSource.healthCheck();
         res.json({
@@ -81,7 +81,6 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
           data: { healthy },
         });
       } else {
-        // Data source doesn't support health checks
         res.json({
           success: true,
           data: { healthy: true, note: 'Health check not supported' },
@@ -92,15 +91,16 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
         success: true,
         data: { healthy: false },
       });
+    } finally {
+      await dataSource.shutdown();
     }
   });
 
   // GET /api/v1/connections/:name/schema - Get schema
   router.get('/:name/schema', async (req: Request, res: Response) => {
     const { name } = req.params;
-    const dataSource = await dataSourceManager.get(name);
 
-    if (!dataSource) {
+    if (!(await dataSourceManager.hasConnection(name))) {
       res.status(404).json({
         success: false,
         error: {
@@ -111,18 +111,32 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       return;
     }
 
-    if (!dataSource.isIntrospectable()) {
-      res.status(400).json({
+    let dataSource;
+    try {
+      dataSource = await dataSourceManager.connectById(name);
+    } catch (error) {
+      res.status(500).json({
         success: false,
         error: {
-          code: 'NOT_SUPPORTED',
-          message: 'This data source does not support schema introspection',
+          code: 'CONNECTION_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to connect',
         },
       });
       return;
     }
 
     try {
+      if (!dataSource.isIntrospectable()) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NOT_SUPPORTED',
+            message: 'This data source does not support schema introspection',
+          },
+        });
+        return;
+      }
+
       const schema = await dataSource.introspect();
       res.json({
         success: true,
@@ -136,6 +150,8 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
           message: error instanceof Error ? error.message : 'Failed to introspect schema',
         },
       });
+    } finally {
+      await dataSource.shutdown();
     }
   });
 

@@ -10,8 +10,8 @@ export function createDataSourcesRouter(options: DataSourcesRouterOptions): Rout
   const { dataSourceManager } = options;
 
   // GET /api/v1/datasources - List all data sources
-  router.get('/', (_req: Request, res: Response) => {
-    const configs = dataSourceManager.listConfigs();
+  router.get('/', async (_req: Request, res: Response) => {
+    const configs = await dataSourceManager.listConfigs();
 
     // Don't expose credentials in response
     const sanitized = configs.map(({ id, type }) => ({ id, type }));

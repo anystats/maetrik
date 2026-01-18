@@ -68,19 +68,16 @@ describe('Query API', () => {
     mockDataSource = createMockDataSource();
 
     const mockDataSourceManager: DataSourceManager = {
-      addConfig: vi.fn(),
-      removeConfig: vi.fn(),
       getConfig: vi.fn((id: string) =>
-        id === 'main' ? { id: 'main', type: 'postgres', credentials: {} } : undefined
+        id === 'main'
+          ? Promise.resolve({ id: 'main', type: 'postgres', credentials: {} })
+          : Promise.reject(new Error('Not found'))
       ),
-      listConfigs: vi.fn(() => [{ id: 'main', type: 'postgres', credentials: {} }]),
-      get: vi.fn((id: string) => {
-        if (id === 'main') {
-          return Promise.resolve(mockDataSource);
-        }
-        return Promise.resolve(undefined);
-      }),
-      shutdown: vi.fn().mockResolvedValue(undefined),
+      listConfigs: vi.fn().mockResolvedValue([{ id: 'main', type: 'postgres', credentials: {} }]),
+      hasConnection: vi.fn((id: string) => Promise.resolve(id === 'main')),
+      connect: vi.fn().mockResolvedValue(mockDataSource),
+      connectById: vi.fn().mockResolvedValue(mockDataSource),
+      canAddToDatabase: vi.fn().mockResolvedValue(true),
     };
 
     app = createApp({

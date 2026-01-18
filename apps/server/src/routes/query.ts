@@ -83,9 +83,8 @@ export function createQueryRouter(options: QueryRouterOptions): Router {
       return;
     }
 
-    // Get data source
-    const dataSource = await dataSourceManager.get(connection);
-    if (!dataSource) {
+    // Check connection exists first
+    if (!(await dataSourceManager.hasConnection(connection))) {
       res.status(404).json({
         success: false,
         error: {
@@ -96,20 +95,34 @@ export function createQueryRouter(options: QueryRouterOptions): Router {
       return;
     }
 
-    // Check if data source is queryable
-    if (!dataSource.isQueryable()) {
-      res.status(400).json({
+    let dataSource;
+    try {
+      dataSource = await dataSourceManager.connectById(connection);
+    } catch (error) {
+      res.status(500).json({
         success: false,
         error: {
-          code: 'NOT_SUPPORTED',
-          message: 'This data source does not support queries',
+          code: 'CONNECTION_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to connect',
         },
       });
       return;
     }
 
-    // Execute query
     try {
+      // Check if data source is queryable
+      if (!dataSource.isQueryable()) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NOT_SUPPORTED',
+            message: 'This data source does not support queries',
+          },
+        });
+        return;
+      }
+
+      // Execute query
       const startTime = Date.now();
       const result = await dataSource.execute(sql, params);
       const duration = Date.now() - startTime;
@@ -117,7 +130,7 @@ export function createQueryRouter(options: QueryRouterOptions): Router {
       res.json({
         success: true,
         data: {
-          columns: result.fields.map((f) => f.name),
+          columns: result.fields.map((f: { name: string }) => f.name),
           rows: result.rows,
           rowCount: result.rowCount,
         },
@@ -134,6 +147,8 @@ export function createQueryRouter(options: QueryRouterOptions): Router {
           message: error instanceof Error ? error.message : 'Query execution failed',
         },
       });
+    } finally {
+      await dataSource.shutdown();
     }
   });
 
