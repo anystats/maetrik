@@ -109,21 +109,23 @@ describe('Connections API', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data).toContainEqual(
         expect.objectContaining({
-          name: 'main',
+          id: 'main',
           type: 'postgres',
+          enabled: true,  // File-config connections are always enabled
         })
       );
     });
   });
 
-  describe('GET /api/v1/connections/:name', () => {
+  describe('GET /api/v1/connections/:id', () => {
     it('returns connection details', async () => {
       const response = await request(app).get('/api/v1/connections/main');
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.name).toBe('main');
+      expect(response.body.data.id).toBe('main');
       expect(response.body.data.type).toBe('postgres');
+      expect(response.body.data.enabled).toBe(true);  // File-config connections are always enabled
     });
 
     it('returns 404 for unknown connection', async () => {

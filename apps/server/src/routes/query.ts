@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
-import type { DataSourceManager } from '@maetrik/core';
+import type { DataSourceManager, StateDatabase } from '@maetrik/core';
 
 export interface QueryRouterOptions {
   dataSourceManager: DataSourceManager;
+  stateDb?: StateDatabase;
 }
 
 // Simple SQL validation - only allow SELECT
@@ -93,6 +94,21 @@ export function createQueryRouter(options: QueryRouterOptions): Router {
         },
       });
       return;
+    }
+
+    // Check if connection is enabled (only for database-stored connections)
+    if (options.stateDb) {
+      const dbConnection = await options.stateDb.getConnection(connection);
+      if (dbConnection && !dbConnection.enabled) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'CONNECTION_DISABLED',
+            message: 'Connection is disabled',
+          },
+        });
+        return;
+      }
     }
 
     let dataSource;

@@ -171,6 +171,8 @@ export class PostgresDataSource
 export const dataSourceFactory: DataSourceFactory = {
   type: 'postgres',
   displayName: 'PostgreSQL',
+  description: 'Connect to PostgreSQL databases',
+  iconPath: './assets/postgres.svg',
   capabilities: {
     queryable: true,
     introspectable: true,
@@ -178,5 +180,13 @@ export const dataSourceFactory: DataSourceFactory = {
     transactional: true,
   },
   credentialsSchema: postgresCredentialsSchema,
+  credentialsFields: {
+    host: { label: 'Host', placeholder: 'localhost' },
+    port: { type: 'number', placeholder: '5432' },
+    database: {},  // Label defaults to "Database"
+    user: {},      // Label defaults to "User"
+    password: { type: 'password' },
+    ssl: { type: 'boolean', label: 'Use SSL' },
+  },
   create: () => new PostgresDataSource(),
 };

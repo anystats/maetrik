@@ -25,6 +25,8 @@ export class PGLiteStateDatabase implements StateDatabase {
         credentials JSONB NOT NULL,
         name TEXT,
         description TEXT,
+        enabled BOOLEAN NOT NULL DEFAULT false,
+        meta JSONB NOT NULL DEFAULT '{}',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -57,14 +59,16 @@ export class PGLiteStateDatabase implements StateDatabase {
   async createConnection(input: CreateConnectionInput): Promise<void> {
     if (!this.db) throw new Error('State database not initialized');
     await this.db.query(
-      `INSERT INTO connections (id, type, credentials, name, description)
-       VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO connections (id, type, credentials, name, description, enabled, meta)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         input.id,
         input.type,
         JSON.stringify(input.credentials),
         input.name ?? null,
         input.description ?? null,
+        false,  // Connections always start disabled
+        JSON.stringify({}),  // Empty meta
       ]
     );
   }
@@ -72,7 +76,7 @@ export class PGLiteStateDatabase implements StateDatabase {
   async getConnection(id: string): Promise<ConnectionRow | undefined> {
     if (!this.db) throw new Error('State database not initialized');
     const result = await this.db.query<ConnectionRow>(
-      'SELECT id, type, credentials, name, description, created_at, updated_at FROM connections WHERE id = $1',
+      'SELECT id, type, credentials, name, description, enabled, meta, created_at, updated_at FROM connections WHERE id = $1',
       [id]
     );
     return result.rows[0];
@@ -81,7 +85,7 @@ export class PGLiteStateDatabase implements StateDatabase {
   async listConnections(): Promise<ConnectionRow[]> {
     if (!this.db) throw new Error('State database not initialized');
     const result = await this.db.query<ConnectionRow>(
-      'SELECT id, type, credentials, name, description, created_at, updated_at FROM connections ORDER BY created_at'
+      'SELECT id, type, credentials, name, description, enabled, meta, created_at, updated_at FROM connections ORDER BY created_at'
     );
     return result.rows;
   }
@@ -112,6 +116,10 @@ export class PGLiteStateDatabase implements StateDatabase {
     if (input.description !== undefined) {
       sets.push(`description = $${paramIndex++}`);
       params.push(input.description);
+    }
+    if (input.enabled !== undefined) {
+      sets.push(`enabled = $${paramIndex++}`);
+      params.push(input.enabled);
     }
 
     params.push(id);

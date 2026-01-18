@@ -79,11 +79,44 @@ export interface DataSourceDriver {
   isTransactional(): this is DataSourceDriver & Transactional;
 }
 
+// ============================================
+// Credentials Field Definitions
+// ============================================
+
+export interface CredentialsFieldDefinition {
+  label?: string;        // Defaults to prettified field name (host_name → "Host Name")
+  type?: 'text' | 'password' | 'number' | 'boolean';  // Defaults to 'text'
+  placeholder?: string;
+  helpText?: string;
+}
+
+export type CredentialsFieldDefinitions = Record<string, CredentialsFieldDefinition>;
+
+// ============================================
+// Factory Interfaces
+// ============================================
+
 export interface DataSourceFactory {
   readonly type: string;
   readonly displayName: string;
   readonly capabilities: DataSourceCapabilities;
   // Using unknown to support multiple zod versions
   readonly credentialsSchema: unknown;
+  create(): DataSourceDriver;
+
+  // Optional metadata for UI
+  readonly description?: string;
+  readonly iconPath?: string;
+  readonly credentialsFields?: CredentialsFieldDefinitions;
+}
+
+export interface ResolvedDataSourceFactory {
+  readonly type: string;
+  readonly displayName: string;
+  readonly description?: string;
+  readonly icon?: string;  // Base64 data URI, e.g., "data:image/png;base64,..."
+  readonly capabilities: DataSourceCapabilities;
+  readonly credentialsSchema: unknown;
+  readonly credentialsFields?: CredentialsFieldDefinitions;
   create(): DataSourceDriver;
 }

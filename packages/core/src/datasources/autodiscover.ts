@@ -1,10 +1,10 @@
-import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
-import type { DataSourceFactory } from '@maetrik/shared';
+import { readdir, readFile } from 'node:fs/promises';
+import { join, extname } from 'node:path';
+import type { DataSourceFactory, ResolvedDataSourceFactory } from '@maetrik/shared';
 
 export interface DiscoveredDataSource {
   packageName: string;
-  factory: DataSourceFactory;
+  factory: ResolvedDataSourceFactory;
 }
 
 export interface AutodiscoverResult {
@@ -23,6 +23,49 @@ export function isValidDataSourceFactory(obj: unknown): obj is DataSourceFactory
     factory.capabilities !== null &&
     typeof factory.create === 'function'
   );
+}
+
+const MIME_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+};
+
+async function resolveIcon(iconPath: string, packageName: string): Promise<string | undefined> {
+  try {
+    const nodeModulesPath = join(process.cwd(), 'node_modules');
+    const packagePath = packageName.startsWith('@')
+      ? join(nodeModulesPath, ...packageName.split('/'))
+      : join(nodeModulesPath, packageName);
+    const fullPath = join(packagePath, iconPath);
+
+    const fileBuffer = await readFile(fullPath);
+    const ext = extname(iconPath).toLowerCase();
+    const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
+    const base64 = fileBuffer.toString('base64');
+
+    return `data:${mimeType};base64,${base64}`;
+  } catch {
+    // Icon file missing or unreadable, continue silently
+    return undefined;
+  }
+}
+
+function resolveFactory(factory: DataSourceFactory, icon: string | undefined): ResolvedDataSourceFactory {
+  return {
+    type: factory.type,
+    displayName: factory.displayName,
+    description: factory.description,
+    icon,
+    capabilities: factory.capabilities,
+    credentialsSchema: factory.credentialsSchema,
+    credentialsFields: factory.credentialsFields,
+    create: () => factory.create(),
+  };
 }
 
 async function findDataSourcePackages(): Promise<string[]> {
@@ -73,7 +116,12 @@ export async function autodiscoverDataSources(): Promise<AutodiscoverResult> {
       const factory = module.dataSourceFactory;
 
       if (isValidDataSourceFactory(factory)) {
-        discoveries.push({ packageName, factory });
+        // Resolve icon if iconPath is specified
+        const icon = factory.iconPath
+          ? await resolveIcon(factory.iconPath, packageName)
+          : undefined;
+        const resolvedFactory = resolveFactory(factory, icon);
+        discoveries.push({ packageName, factory: resolvedFactory });
       } else {
         errors.push({
           packageName,

@@ -4,6 +4,8 @@ export interface ConnectionRow {
   credentials: Record<string, unknown>;
   name?: string;
   description?: string;
+  enabled: boolean;
+  meta: Record<string, unknown>;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -20,6 +22,8 @@ export interface UpdateConnectionInput {
   credentials?: Record<string, unknown>;
   name?: string;
   description?: string;
+  enabled?: boolean;
+  // Note: meta not in update input - server-managed only
 }
 
 export interface StateDatabase {

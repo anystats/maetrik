@@ -18,6 +18,10 @@ export {
   type DataSourceConfig,
   type DataSourceDriver,
   type DataSourceFactory,
+  type ResolvedDataSourceFactory,
+  // Credentials field definitions
+  type CredentialsFieldDefinition,
+  type CredentialsFieldDefinitions,
   // Schema types (new versions with different shapes)
   type QueryResult as DataSourceQueryResult,
   type SchemaColumn as DataSourceSchemaColumn,

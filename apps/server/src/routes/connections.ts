@@ -14,6 +14,7 @@ const updateConnectionSchema = z.object({
   credentials: z.record(z.string(), z.unknown()).optional(),
   name: z.string().optional(),
   description: z.string().optional(),
+  enabled: z.boolean().optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'At least one field must be provided',
 });
@@ -30,10 +31,24 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
   // GET /api/v1/connections - List all data sources (connections)
   router.get('/', async (_req: Request, res: Response) => {
     const configs = await dataSourceManager.listConfigs();
-    const connectionList = configs.map((config) => ({
-      name: config.id,
-      type: config.type,
-    }));
+
+    // Get metadata from state database if available
+    const dbConnections = options.stateDb
+      ? await options.stateDb.listConnections()
+      : [];
+    const metadataMap = new Map(dbConnections.map(c => [c.id, { name: c.name, description: c.description, enabled: c.enabled }]));
+
+    const connectionList = configs.map((config) => {
+      const metadata = metadataMap.get(config.id);
+      return {
+        id: config.id,
+        type: config.type,
+        name: metadata?.name,
+        description: metadata?.description,
+        // File-config connections are always enabled, DB connections have explicit enabled flag
+        enabled: metadata?.enabled ?? true,
+      };
+    });
 
     res.json({
       success: true,
@@ -41,17 +56,28 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
     });
   });
 
-  // GET /api/v1/connections/:name - Get connection details
-  router.get('/:name', async (req: Request, res: Response) => {
-    const { name } = req.params;
+  // GET /api/v1/connections/:id - Get connection details
+  router.get('/:id', async (req: Request, res: Response) => {
+    const { id } = req.params;
 
     try {
-      const config = await dataSourceManager.getConfig(name);
+      const config = await dataSourceManager.getConfig(id);
+
+      // Get metadata from state database if available
+      const dbConnection = options.stateDb
+        ? await options.stateDb.getConnection(id)
+        : undefined;
+
       res.json({
         success: true,
         data: {
-          name: config.id,
+          id: config.id,
           type: config.type,
+          name: dbConnection?.name,
+          description: dbConnection?.description,
+          // File-config connections are always enabled, DB connections have explicit enabled flag
+          enabled: dbConnection?.enabled ?? true,
+          credentials: config.credentials,
         },
       });
     } catch {
@@ -59,22 +85,22 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
         success: false,
         error: {
           code: 'CONNECTION_NOT_FOUND',
-          message: `Connection '${name}' not found`,
+          message: `Connection '${id}' not found`,
         },
       });
     }
   });
 
-  // GET /api/v1/connections/:name/health - Check connection health
-  router.get('/:name/health', async (req: Request, res: Response) => {
-    const { name } = req.params;
+  // GET /api/v1/connections/:id/health - Check connection health
+  router.get('/:id/health', async (req: Request, res: Response) => {
+    const { id } = req.params;
 
-    if (!(await dataSourceManager.hasConnection(name))) {
+    if (!(await dataSourceManager.hasConnection(id))) {
       res.status(404).json({
         success: false,
         error: {
           code: 'CONNECTION_NOT_FOUND',
-          message: `Connection '${name}' not found`,
+          message: `Connection '${id}' not found`,
         },
       });
       return;
@@ -82,7 +108,7 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
 
     let dataSource;
     try {
-      dataSource = await dataSourceManager.connectById(name);
+      dataSource = await dataSourceManager.connectById(id);
     } catch {
       res.json({
         success: true,
@@ -114,16 +140,16 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
     }
   });
 
-  // GET /api/v1/connections/:name/schema - Get schema
-  router.get('/:name/schema', async (req: Request, res: Response) => {
-    const { name } = req.params;
+  // GET /api/v1/connections/:id/schema - Get schema
+  router.get('/:id/schema', async (req: Request, res: Response) => {
+    const { id } = req.params;
 
-    if (!(await dataSourceManager.hasConnection(name))) {
+    if (!(await dataSourceManager.hasConnection(id))) {
       res.status(404).json({
         success: false,
         error: {
           code: 'CONNECTION_NOT_FOUND',
-          message: `Connection '${name}' not found`,
+          message: `Connection '${id}' not found`,
         },
       });
       return;
@@ -131,7 +157,7 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
 
     let dataSource;
     try {
-      dataSource = await dataSourceManager.connectById(name);
+      dataSource = await dataSourceManager.connectById(id);
     } catch (error) {
       res.status(500).json({
         success: false,
@@ -234,7 +260,128 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
 
     res.status(201).json({
       success: true,
-      data: { id, type, name, description },
+      data: { id, type, name, description, enabled: false },
+    });
+  });
+
+  // PUT /api/v1/connections/:id - Update a connection
+  router.put('/:id', async (req: Request, res: Response) => {
+    if (!options.stateDb) {
+      res.status(501).json({
+        success: false,
+        error: {
+          code: 'NOT_IMPLEMENTED',
+          message: 'Connection management requires a state database',
+        },
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    const parsed = updateConnectionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const flattened = parsed.error.flatten();
+      const firstFieldError = Object.values(flattened.fieldErrors)[0];
+      const message = firstFieldError?.[0] ?? flattened.formErrors[0] ?? 'Validation failed';
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message,
+          details: flattened,
+        },
+      });
+      return;
+    }
+
+    // Check if this is a file-config connection (not editable)
+    const canAdd = await dataSourceManager.canAddToDatabase(id);
+    if (!canAdd) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'CONNECTION_READONLY',
+          message: `Connection '${id}' is defined in file configuration and cannot be modified`,
+        },
+      });
+      return;
+    }
+
+    // Check if exists in database
+    const exists = await options.stateDb.connectionExists(id);
+    if (!exists) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'CONNECTION_NOT_FOUND',
+          message: `Connection '${id}' not found`,
+        },
+      });
+      return;
+    }
+
+    await options.stateDb.updateConnection(id, parsed.data);
+
+    const updated = await options.stateDb.getConnection(id);
+    res.json({
+      success: true,
+      data: {
+        id: updated!.id,
+        type: updated!.type,
+        name: updated!.name,
+        description: updated!.description,
+        enabled: updated!.enabled,
+      },
+    });
+  });
+
+  // DELETE /api/v1/connections/:id - Delete a connection
+  router.delete('/:id', async (req: Request, res: Response) => {
+    if (!options.stateDb) {
+      res.status(501).json({
+        success: false,
+        error: {
+          code: 'NOT_IMPLEMENTED',
+          message: 'Connection management requires a state database',
+        },
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    // Check if this is a file-config connection (not deletable)
+    const canAdd = await dataSourceManager.canAddToDatabase(id);
+    if (!canAdd) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'CONNECTION_READONLY',
+          message: `Connection '${id}' is defined in file configuration and cannot be deleted`,
+        },
+      });
+      return;
+    }
+
+    // Check if exists in database
+    const exists = await options.stateDb.connectionExists(id);
+    if (!exists) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'CONNECTION_NOT_FOUND',
+          message: `Connection '${id}' not found`,
+        },
+      });
+      return;
+    }
+
+    await options.stateDb.deleteConnection(id);
+
+    res.json({
+      success: true,
+      data: { deleted: id },
     });
   });
 
