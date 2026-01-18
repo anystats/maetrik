@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
-import type { DataSourceManager } from '@maetrik/core';
+import type { DataSourceManager, StateDatabase } from '@maetrik/core';
 
 export interface ConnectionsRouterOptions {
   dataSourceManager: DataSourceManager;
+  stateDb?: StateDatabase;
 }
 
 export function createConnectionsRouter(options: ConnectionsRouterOptions): Router {
