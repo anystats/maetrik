@@ -1,8 +1,8 @@
-import type { StateDatabase, StateDatabaseConfig } from './types.js';
+import type { StateDatabase, StateStorageConfig } from './types.js';
 import { PGLiteStateDatabase } from './pglite.js';
 import { PostgresStateDatabase } from './postgres.js';
 
-export function createStateDatabase(config: StateDatabaseConfig): StateDatabase {
+export function createStateDatabase(config: StateStorageConfig): StateDatabase {
   switch (config.type) {
     case 'pglite':
       return new PGLiteStateDatabase(config.path ?? './data/state.db');

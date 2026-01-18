@@ -41,12 +41,12 @@ export interface StateDatabase {
   deleteConnection(id: string): Promise<void>;
 }
 
-export interface StateDatabaseConfig {
+export interface StateStorageConfig {
   type: 'pglite' | 'postgres';
   path?: string;              // for pglite
   connectionString?: string;  // for postgres
 }
 
-export interface StateDatabaseFactory {
-  create(config: StateDatabaseConfig): StateDatabase;
+export interface StateStorageFactory {
+  create(config: StateStorageConfig): StateDatabase;
 }

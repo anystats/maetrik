@@ -4,7 +4,7 @@ export type {
   ConnectionConfig,
   LLMConfig,
   AuthConfig,
-  StorageConfig,
+  StateStorageConfig,
   MaetrikConfig,
   MaetrikConfigInput,
 } from '../config/schema.js';

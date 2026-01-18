@@ -3,7 +3,7 @@
 
 server:
   port: 3000
-  host: "localhost"
+  host: localhost
 
 # Database connections
 connections:
@@ -32,17 +32,10 @@ auth:
   # driver: password
   # sessionSecret: ${SESSION_SECRET}
 
-# State storage
-storage:
-  driver: sqlite
-  path: ./data/maetrik.db
-
-# State database (internal server storage)
-# For npm/local: uses PGLite (embedded)
-stateDatabase:
+# State storage for internal server data
+# Supported: pglite (embedded) and postgres (external)
+stateStorage:
   type: pglite
   path: ./data/state.db
-  # For Docker: use PostgreSQL
   # type: postgres
   # connectionString: ${STATE_DATABASE_URL}
-

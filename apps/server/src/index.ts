@@ -5,12 +5,13 @@ import { createDataSourceManagerFromConfig, createStateDatabase } from '@maetrik
 const logger = createLogger('server');
 
 async function main() {
+  // Application config with env interpolation
   const config = await loadConfig({ env: process.env as Record<string, string> });
 
-  // Initialize state database first
-  const stateDb = createStateDatabase(config.stateDatabase ?? { type: 'pglite' });
+  // Init for state database storage
+  const stateDb = createStateDatabase(config.stateStorage ?? { type: 'pglite' });
   try {
-    logger.info('Initializing state database...', { type: config.stateDatabase?.type ?? 'pglite' });
+    logger.info('Initializing state storage...', { type: config.stateStorage?.type ?? 'pglite' });
     await stateDb.initialize();
     logger.info('State database initialized');
   } catch (error) {
