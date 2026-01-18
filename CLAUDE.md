@@ -49,20 +49,34 @@ docker build -f docker/Dockerfile -t maetrik .
 
 Build order matters due to dependencies:
 1. `packages/shared` - Base utilities (config, logger, types)
-2. `packages/core` - Business logic (drivers, LLM, query translation)
-3. `packages/driver-postgres` - PostgreSQL driver implementation
+2. `packages/core` - Business logic (data sources, connections, LLM, query translation, state database)
+3. `packages/datasource-postgres` - PostgreSQL data source driver
 4. `apps/server` - Express API server (depends on all above)
+5. `apps/web` - Next.js frontend (in development)
 
 ### Key Architectural Patterns
 
-**Driver Registry Pattern** (`packages/core/src/drivers/`):
-- `registry.ts` - Factory registry for database drivers
-- `manager.ts` - Lifecycle management (init, health, shutdown)
-- `autodiscover.ts` - Auto-discovers available driver packages
-- New drivers extend the `DatabaseDriver` interface from `@maetrik/shared/types`
+**Data Source Pattern** (`packages/core/src/datasources/`):
+- `registry.ts` - Factory registry for data source drivers
+- `manager.ts` - Stateless manager with lazy instantiation (callers manage driver lifecycle)
+- `autodiscover.ts` - Auto-discovers `@maetrik/datasource-*` packages
+- `base-driver.ts` - Abstract base class with type guard methods
+- Capability-based interfaces: `Queryable`, `Introspectable`, `HealthCheckable`, `Transactional`
+
+**Connection Config Resolver** (`packages/core/src/connections/`):
+- `sources/file.ts` - Loads connections from config file (read-only)
+- `sources/database.ts` - Loads connections from state database (mutable via API)
+- `resolver.ts` - Combines sources with duplicate validation
+- Same connection ID in both sources is an error
+
+**State Database** (`packages/core/src/state/`):
+- Internal storage for app state (connections, future: queries, dashboards)
+- `pglite.ts` - PGLite implementation (embedded, for npm/local)
+- `postgres.ts` - PostgreSQL implementation (for Docker/production)
+- `factory.ts` - Creates appropriate implementation based on config
 
 **LLM Registry Pattern** (`packages/core/src/llm/`):
-- Same registry pattern as drivers
+- Same registry pattern as data sources
 - Supports OpenAI and Ollama providers
 - Add new providers by implementing `LLMDriver` interface
 
@@ -74,14 +88,41 @@ Build order matters due to dependencies:
 
 ### API Endpoints (apps/server)
 
+**Query:**
 - `POST /api/v1/ask` - Natural language query (main feature)
 - `POST /api/v1/query` - Raw SQL execution (SELECT only)
-- `GET /api/v1/connections` - List database connections
-- `GET /api/v1/connections/:name/schema` - Introspect schema
+
+**Connections (CRUD):**
+- `GET /api/v1/connections` - List all connections
+- `GET /api/v1/connections/:id` - Get connection details
+- `POST /api/v1/connections` - Create connection (database-stored only)
+- `PUT /api/v1/connections/:id` - Update connection (database-stored only)
+- `DELETE /api/v1/connections/:id` - Delete connection (database-stored only)
+- `GET /api/v1/connections/:id/health` - Test connection health
+- `GET /api/v1/connections/:id/schema` - Introspect schema
+
+**Data Sources:**
+- `GET /api/v1/datasources/types` - List available driver types
+- `GET /api/v1/datasources` - List configured data sources
+- `POST /api/v1/datasources/:id/test` - Test connection
 
 ### Configuration
 
 Uses `maetrik.config.yaml` with `${ENV_VAR}` interpolation. Schema validated with Zod in `packages/shared/src/config/`.
+
+```yaml
+dataSources:
+  - id: "main-db"
+    type: postgres
+    credentials:
+      host: ${DB_HOST}
+      port: 5432
+      database: ${DB_NAME}
+
+stateDatabase:
+  type: pglite  # or 'postgres'
+  path: ./data/state.db
+```
 
 ### Package Exports
 
@@ -89,9 +130,17 @@ Uses `maetrik.config.yaml` with `${ENV_VAR}` interpolation. Schema validated wit
 - `@maetrik/shared` - Main exports (config, logger)
 - `@maetrik/shared/types` - Type definitions only
 
+`@maetrik/core` exports:
+- Data source types and factories
+- Connection config resolver
+- State database implementations
+- LLM and query translation
+
 ## Key Files
 
 - `packages/shared/src/config/schema.ts` - Zod config schemas with defaults
+- `packages/core/src/datasources/manager.ts` - Stateless data source manager
+- `packages/core/src/connections/resolver.ts` - Multi-source connection resolver
+- `packages/core/src/state/pglite.ts` - PGLite state database
 - `packages/core/src/query/translator.ts` - NL to SQL translation logic
-- `packages/core/src/query/prompts.ts` - LLM prompt engineering
-- `apps/server/src/routes/ask.ts` - Main /ask endpoint handler
+- `apps/server/src/routes/connections.ts` - Connections CRUD API

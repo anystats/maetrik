@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import type { LLMConfig, DataSourceConfig } from '@maetrik/shared';
 import {
   createLLMRegistry,
@@ -24,6 +25,7 @@ export interface AppOptions {
   llm?: LLMConfig;
   dataSourceManager: DataSourceManager;
   stateDb?: StateDatabase;
+  corsOrigins?: string[];
 }
 
 export interface AppContext {
@@ -58,6 +60,17 @@ export function createApp(options: AppOptions): express.Express {
     semanticLayers,
   };
   app.set('context', context);
+
+  // CORS configuration
+  const corsOptions: cors.CorsOptions = {
+    origin: options.corsOrigins || [
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:3003',
+    ],
+    credentials: true,
+  };
+  app.use(cors(corsOptions));
 
   app.use(express.json());
 
