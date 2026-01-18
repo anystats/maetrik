@@ -10,6 +10,7 @@ import {
   type QueryTranslator,
   type SemanticLayer,
   type DataSourceManager,
+  type StateDatabase,
 } from '@maetrik/core';
 import { createConnectionsRouter } from './routes/connections.js';
 import { createQueryRouter } from './routes/query.js';
@@ -22,6 +23,7 @@ export interface AppOptions {
   dataSources?: DataSourceConfig[];
   llm?: LLMConfig;
   dataSourceManager: DataSourceManager;
+  stateDb?: StateDatabase;
 }
 
 export interface AppContext {

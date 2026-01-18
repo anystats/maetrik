@@ -17,21 +17,28 @@ async function main() {
     logger.error('Failed to initialize state database', {
       error: error instanceof Error ? error.message : String(error),
     });
-    throw error; // State database is required
+    throw error;
   }
 
   // Convert dataSources config to DataSourceConfig format
-  const dataSourceConfigs = config.dataSources.map((ds) => ({
+  const fileConfigs = config.dataSources.map((ds) => ({
     id: ds.id,
     type: ds.type,
     credentials: ds.credentials,
   }));
-  const dataSourceManager = await createDataSourceManagerFromConfig(dataSourceConfigs, logger);
+
+  // Create manager with both file and database sources
+  const dataSourceManager = await createDataSourceManagerFromConfig({
+    fileConfigs,
+    stateDb,
+    logger,
+  });
 
   const app = createApp({
     dataSources: config.dataSources,
     llm: config.llm,
     dataSourceManager,
+    stateDb,
   });
 
   const context = getAppContext(app);
@@ -51,7 +58,6 @@ async function main() {
       logger.error('Failed to initialize LLM driver', {
         error: error instanceof Error ? error.message : String(error),
       });
-      // Continue without LLM - ask endpoint will fail gracefully
     }
   } else {
     logger.warn('No LLM configuration provided, /api/v1/ask endpoint will not work');
@@ -79,14 +85,7 @@ async function main() {
         });
       }
 
-      try {
-        await dataSourceManager.shutdown();
-        logger.info('Data sources closed');
-      } catch (error) {
-        logger.warn('Error shutting down data sources', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      // Note: No dataSourceManager.shutdown() - connections are caller-managed now
 
       try {
         await stateDb.shutdown();
