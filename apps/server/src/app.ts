@@ -15,6 +15,7 @@ import {
 import { createConnectionsRouter } from './routes/connections.js';
 import { createQueryRouter } from './routes/query.js';
 import { createAskRouter } from './routes/ask.js';
+import { createDataSourcesRouter } from './routes/datasources.js';
 
 const startTime = Date.now();
 
@@ -98,6 +99,14 @@ export function createApp(options: AppOptions): express.Express {
     '/api/v1/ask',
     createAskRouter({ driverManager, llmManager, queryTranslator, semanticLayers })
   );
+
+  // Data Sources API (new architecture)
+  if (dataSourceManager) {
+    app.use(
+      '/api/v1/datasources',
+      createDataSourcesRouter({ dataSourceManager })
+    );
+  }
 
   // 404 handler
   app.use((_req: Request, res: Response) => {
