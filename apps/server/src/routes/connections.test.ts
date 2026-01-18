@@ -2,36 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 import type { Express } from 'express';
+import type { DataSourceManager, DataSourceDriver } from '@maetrik/core';
 
 // Mock core modules
 vi.mock('@maetrik/core', () => ({
-  createDriverRegistry: vi.fn(() => ({
-    register: vi.fn(),
-    get: vi.fn(),
-    list: vi.fn(() => ['postgres']),
-    createDriver: vi.fn(),
-  })),
-  createDriverManager: vi.fn(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    getDriver: vi.fn(() => ({
-      name: 'postgres',
-      dialect: 'postgresql',
-      healthCheck: vi.fn().mockResolvedValue(true),
-      introspect: vi.fn().mockResolvedValue({
-        tables: {
-          users: {
-            name: 'users',
-            columns: [
-              { name: 'id', type: 'uuid', nullable: false, primaryKey: true },
-            ],
-          },
-        },
-      }),
-    })),
-    healthCheck: vi.fn().mockResolvedValue(true),
-    shutdown: vi.fn().mockResolvedValue(undefined),
-  })),
-  postgresDriverFactory: { name: 'postgres', dialect: 'postgresql', create: vi.fn() },
   createLLMRegistry: vi.fn(() => ({
     register: vi.fn(),
     get: vi.fn(),
@@ -61,41 +35,61 @@ vi.mock('@maetrik/core', () => ({
   })),
 }));
 
+const createMockDataSource = (): DataSourceDriver => ({
+  name: 'main',
+  type: 'postgres',
+  init: vi.fn().mockResolvedValue(undefined),
+  shutdown: vi.fn().mockResolvedValue(undefined),
+  capabilities: () => ({
+    queryable: true,
+    introspectable: true,
+    healthCheckable: true,
+    transactional: true,
+  }),
+  isQueryable: (() => true) as DataSourceDriver['isQueryable'],
+  isIntrospectable: (() => true) as DataSourceDriver['isIntrospectable'],
+  isHealthCheckable: (() => true) as DataSourceDriver['isHealthCheckable'],
+  isTransactional: (() => true) as DataSourceDriver['isTransactional'],
+  healthCheck: vi.fn().mockResolvedValue(true),
+  introspect: vi.fn().mockResolvedValue({
+    tables: [
+      {
+        name: 'users',
+        schema: 'public',
+        columns: [
+          { name: 'id', type: 'uuid', nullable: false, isPrimaryKey: true },
+        ],
+      },
+    ],
+  }),
+  execute: vi.fn().mockResolvedValue({
+    rows: [],
+    rowCount: 0,
+    fields: [],
+  }),
+});
+
 describe('Connections API', () => {
   let app: Express;
+  let mockDataSource: ReturnType<typeof createMockDataSource>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const mockDriverManager = {
-      initialize: vi.fn().mockResolvedValue(undefined),
-      getDriver: vi.fn(() => ({
-        name: 'postgres',
-        dialect: 'postgresql',
-        healthCheck: vi.fn().mockResolvedValue(true),
-        introspect: vi.fn().mockResolvedValue({
-          tables: {
-            users: {
-              name: 'users',
-              columns: [
-                { name: 'id', type: 'uuid', nullable: false, primaryKey: true },
-              ],
-            },
-          },
-        }),
-      })),
-      healthCheck: vi.fn().mockResolvedValue(true),
+    mockDataSource = createMockDataSource();
+
+    const mockDataSourceManager: DataSourceManager = {
+      addConfig: vi.fn(),
+      removeConfig: vi.fn(),
+      getConfig: vi.fn((id: string) =>
+        id === 'main' ? { id: 'main', type: 'postgres', credentials: {} } : undefined
+      ),
+      listConfigs: vi.fn(() => [{ id: 'main', type: 'postgres', credentials: {} }]),
+      get: vi.fn().mockResolvedValue(mockDataSource),
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
+
     app = createApp({
-      connections: {
-        main: {
-          driver: 'postgres',
-          host: 'localhost',
-          port: 5432,
-          database: 'test',
-        },
-      },
-      driverManager: mockDriverManager as any,
+      dataSourceManager: mockDataSourceManager,
     });
   });
 
@@ -108,7 +102,7 @@ describe('Connections API', () => {
       expect(response.body.data).toContainEqual(
         expect.objectContaining({
           name: 'main',
-          driver: 'postgres',
+          type: 'postgres',
         })
       );
     });
@@ -121,7 +115,7 @@ describe('Connections API', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.name).toBe('main');
-      expect(response.body.data.driver).toBe('postgres');
+      expect(response.body.data.type).toBe('postgres');
     });
 
     it('returns 404 for unknown connection', async () => {
@@ -148,7 +142,8 @@ describe('Connections API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.tables).toHaveProperty('users');
+      expect(response.body.data.tables).toHaveLength(1);
+      expect(response.body.data.tables[0].name).toBe('users');
     });
   });
 });

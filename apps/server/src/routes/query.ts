@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import type { DriverManager } from '@maetrik/core';
+import type { DataSourceManager } from '@maetrik/core';
 
 export interface QueryRouterOptions {
-  driverManager: DriverManager;
+  dataSourceManager: DataSourceManager;
 }
 
 // Simple SQL validation - only allow SELECT
@@ -42,7 +42,7 @@ function isSelectOnly(sql: string): boolean {
 
 export function createQueryRouter(options: QueryRouterOptions): Router {
   const router = Router();
-  const { driverManager } = options;
+  const { dataSourceManager } = options;
 
   // POST /api/v1/query - Execute SQL query
   router.post('/', async (req: Request, res: Response) => {
@@ -83,9 +83,9 @@ export function createQueryRouter(options: QueryRouterOptions): Router {
       return;
     }
 
-    // Get driver
-    const driver = driverManager.getDriver(connection);
-    if (!driver) {
+    // Get data source
+    const dataSource = await dataSourceManager.get(connection);
+    if (!dataSource) {
       res.status(404).json({
         success: false,
         error: {
@@ -96,16 +96,28 @@ export function createQueryRouter(options: QueryRouterOptions): Router {
       return;
     }
 
+    // Check if data source is queryable
+    if (!dataSource.isQueryable()) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'NOT_SUPPORTED',
+          message: 'This data source does not support queries',
+        },
+      });
+      return;
+    }
+
     // Execute query
     try {
       const startTime = Date.now();
-      const result = await driver.execute(sql, params);
+      const result = await dataSource.execute(sql, params);
       const duration = Date.now() - startTime;
 
       res.json({
         success: true,
         data: {
-          columns: result.columns,
+          columns: result.fields.map((f) => f.name),
           rows: result.rows,
           rowCount: result.rowCount,
         },

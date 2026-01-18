@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import type { DriverManager, LLMManager, QueryTranslator, SemanticLayer } from '@maetrik/core';
+import type { DataSourceManager, LLMManager, QueryTranslator, SemanticLayer } from '@maetrik/core';
 
 export interface AskRouterOptions {
-  driverManager: DriverManager;
+  dataSourceManager: DataSourceManager;
   llmManager: LLMManager;
   queryTranslator: QueryTranslator;
   semanticLayers: Map<string, SemanticLayer>;
@@ -30,9 +30,64 @@ function isSelectOnly(sql: string): boolean {
   return true;
 }
 
+// Map data source type to SQL dialect
+function getDialect(type: string): string {
+  const dialectMap: Record<string, string> = {
+    postgres: 'postgresql',
+    mysql: 'mysql',
+    sqlite: 'sqlite',
+    mssql: 'mssql',
+  };
+  return dialectMap[type] || type;
+}
+
+// Convert array-based schema to record-based schema for semantic layer
+interface ArraySchemaTable {
+  name: string;
+  schema: string;
+  columns: Array<{
+    name: string;
+    type: string;
+    nullable: boolean;
+    isPrimaryKey: boolean;
+  }>;
+}
+
+interface ArraySchema {
+  tables: ArraySchemaTable[];
+}
+
+interface RecordSchema {
+  tables: Record<string, {
+    name: string;
+    columns: Array<{
+      name: string;
+      type: string;
+      nullable: boolean;
+      primaryKey?: boolean;
+    }>;
+  }>;
+}
+
+function convertSchemaFormat(arraySchema: ArraySchema): RecordSchema {
+  const tables: RecordSchema['tables'] = {};
+  for (const table of arraySchema.tables) {
+    tables[table.name] = {
+      name: table.name,
+      columns: table.columns.map((col) => ({
+        name: col.name,
+        type: col.type,
+        nullable: col.nullable,
+        primaryKey: col.isPrimaryKey,
+      })),
+    };
+  }
+  return { tables };
+}
+
 export function createAskRouter(options: AskRouterOptions): Router {
   const router = Router();
-  const { driverManager, llmManager, queryTranslator, semanticLayers } = options;
+  const { dataSourceManager, llmManager, queryTranslator, semanticLayers } = options;
 
   router.post('/', async (req: Request, res: Response) => {
     const { question, connection } = req.body;
@@ -60,14 +115,37 @@ export function createAskRouter(options: AskRouterOptions): Router {
       return;
     }
 
-    // Get driver
-    const driver = driverManager.getDriver(connection);
-    if (!driver) {
+    // Get data source
+    const dataSource = await dataSourceManager.get(connection);
+    if (!dataSource) {
       res.status(404).json({
         success: false,
         error: {
           code: 'CONNECTION_NOT_FOUND',
           message: `Connection '${connection}' not found`,
+        },
+      });
+      return;
+    }
+
+    // Check capabilities
+    if (!dataSource.isQueryable()) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'NOT_SUPPORTED',
+          message: 'This data source does not support queries',
+        },
+      });
+      return;
+    }
+
+    if (!dataSource.isIntrospectable()) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'NOT_SUPPORTED',
+          message: 'This data source does not support schema introspection',
         },
       });
       return;
@@ -81,18 +159,21 @@ export function createAskRouter(options: AskRouterOptions): Router {
       if (!semanticLayer) {
         // Import dynamically to avoid circular dependencies in tests
         const { createSemanticLayer } = await import('@maetrik/core');
-        const rawSchema = await driver.introspect();
-        semanticLayer = createSemanticLayer(rawSchema);
+        const rawSchema = await dataSource.introspect();
+        // Convert array-based schema to record-based schema expected by semantic layer
+        const convertedSchema = convertSchemaFormat(rawSchema as ArraySchema);
+        semanticLayer = createSemanticLayer(convertedSchema);
         semanticLayer.inferRelationships();
         semanticLayers.set(connection, semanticLayer);
       }
 
       const schema = semanticLayer.toSchemaDefinition();
+      const dialect = getDialect(dataSource.type);
 
       // Translate natural language to SQL
       const translation = await queryTranslator.translate(question, {
         schema,
-        dialect: driver.dialect,
+        dialect,
         maxRows: 1000,
       });
 
@@ -109,13 +190,13 @@ export function createAskRouter(options: AskRouterOptions): Router {
       }
 
       // Execute the query
-      const result = await driver.execute(translation.sql);
+      const result = await dataSource.execute(translation.sql);
       const duration = Date.now() - startTime;
 
       res.json({
         success: true,
         data: {
-          columns: result.columns,
+          columns: result.fields.map((f) => f.name),
           rows: result.rows,
           rowCount: result.rowCount,
         },

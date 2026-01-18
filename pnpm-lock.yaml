@@ -54,16 +54,25 @@ importers:
 
   packages/core:
     dependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.3.15
+        version: 0.3.15
       '@maetrik/shared':
         specifier: workspace:*
         version: link:../shared
       openai:
         specifier: ^6.16.0
         version: 6.16.0(zod@4.3.5)
+      pg:
+        specifier: ^8.17.1
+        version: 8.17.1
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.30
+      '@types/pg':
+        specifier: ^8.16.0
+        version: 8.16.0
       typescript:
         specifier: ^5.3.0
         version: 5.9.3
@@ -125,6 +134,10 @@ importers:
         version: 4.0.17(@types/node@25.0.9)(yaml@2.8.2)
 
 packages:
+
+  /@electric-sql/pglite@0.3.15:
+    resolution: {integrity: sha512-Cj++n1Mekf9ETfdc16TlDi+cDDQF0W7EcbyRHYOAeZdsAe8M/FJg18itDTSwyHfar2WIezawM9o0EKaRGVKygQ==}
+    dev: false
 
   /@esbuild/aix-ppc64@0.21.5:
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}

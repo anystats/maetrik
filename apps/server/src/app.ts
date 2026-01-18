@@ -1,12 +1,11 @@
 import express, { Request, Response, NextFunction } from 'express';
-import type { ConnectionConfig, LLMConfig, DataSourceConfig } from '@maetrik/shared';
+import type { LLMConfig, DataSourceConfig } from '@maetrik/shared';
 import {
   createLLMRegistry,
   createLLMManager,
   ollamaDriverFactory,
   openaiDriverFactory,
   createQueryTranslator,
-  type DriverManager,
   type LLMManager,
   type QueryTranslator,
   type SemanticLayer,
@@ -20,16 +19,13 @@ import { createDataSourcesRouter } from './routes/datasources.js';
 const startTime = Date.now();
 
 export interface AppOptions {
-  connections?: Record<string, ConnectionConfig>;
   dataSources?: DataSourceConfig[];
   llm?: LLMConfig;
-  driverManager: DriverManager;
-  dataSourceManager?: DataSourceManager;
+  dataSourceManager: DataSourceManager;
 }
 
 export interface AppContext {
-  driverManager: DriverManager;
-  dataSourceManager?: DataSourceManager;
+  dataSourceManager: DataSourceManager;
   llmManager: LLMManager;
   queryTranslator: QueryTranslator;
   semanticLayers: Map<string, SemanticLayer>;
@@ -37,7 +33,7 @@ export interface AppContext {
 
 export function createApp(options: AppOptions): express.Express {
   const app = express();
-  const { connections = {}, dataSources = [], llm, driverManager, dataSourceManager } = options;
+  const { dataSourceManager } = options;
 
   // Setup LLM registry and manager
   const llmRegistry = createLLMRegistry();
@@ -54,7 +50,6 @@ export function createApp(options: AppOptions): express.Express {
 
   // Store context on app
   const context: AppContext = {
-    driverManager,
     dataSourceManager,
     llmManager,
     queryTranslator,
@@ -82,31 +77,29 @@ export function createApp(options: AppOptions): express.Express {
     });
   });
 
-  // Connections API
+  // Connections API (uses data source manager)
   app.use(
     '/api/v1/connections',
-    createConnectionsRouter({ connections, driverManager })
+    createConnectionsRouter({ dataSourceManager })
   );
 
   // Query API (raw SQL)
   app.use(
     '/api/v1/query',
-    createQueryRouter({ driverManager })
+    createQueryRouter({ dataSourceManager })
   );
 
   // Ask API (natural language)
   app.use(
     '/api/v1/ask',
-    createAskRouter({ driverManager, llmManager, queryTranslator, semanticLayers })
+    createAskRouter({ dataSourceManager, llmManager, queryTranslator, semanticLayers })
   );
 
-  // Data Sources API (new architecture)
-  if (dataSourceManager) {
-    app.use(
-      '/api/v1/datasources',
-      createDataSourcesRouter({ dataSourceManager })
-    );
-  }
+  // Data Sources API
+  app.use(
+    '/api/v1/datasources',
+    createDataSourcesRouter({ dataSourceManager })
+  );
 
   // 404 handler
   app.use((_req: Request, res: Response) => {
@@ -136,9 +129,4 @@ export function createApp(options: AppOptions): express.Express {
 
 export function getAppContext(app: express.Express): AppContext {
   return app.get('context') as AppContext;
-}
-
-// Keep backward compatibility
-export function getDriverManager(app: express.Express): DriverManager {
-  return getAppContext(app).driverManager;
 }

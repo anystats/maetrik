@@ -44,6 +44,12 @@ export const dataSourceConfigSchema = z.object({
   credentials: z.record(z.string(), z.any()),
 });
 
+export const stateDatabaseConfigSchema = z.object({
+  type: z.enum(['pglite', 'postgres']).default('pglite'),
+  path: z.string().optional(),
+  connectionString: z.string().optional(),
+});
+
 export const maetrikConfigSchema = z.object({
   server: serverConfigSchema.default({ port: 3000, host: 'localhost' }),
   connections: z.record(z.string(), connectionConfigSchema).default({}),
@@ -51,6 +57,7 @@ export const maetrikConfigSchema = z.object({
   llm: llmConfigSchema.default({ driver: 'ollama', model: 'llama3' }),
   auth: authConfigSchema.default({ driver: 'none' }),
   storage: storageConfigSchema.default({ driver: 'sqlite', path: './data/maetrik.db' }),
+  stateDatabase: stateDatabaseConfigSchema.default({ type: 'pglite' }),
 });
 
 // Inferred types from Zod schemas - these are the source of truth
@@ -60,6 +67,7 @@ export type DataSourceConfigEntry = z.infer<typeof dataSourceConfigSchema>;
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 export type AuthConfig = z.infer<typeof authConfigSchema>;
 export type StorageConfig = z.infer<typeof storageConfigSchema>;
+export type StateDatabaseConfig = z.infer<typeof stateDatabaseConfigSchema>;
 export type MaetrikConfig = z.infer<typeof maetrikConfigSchema>;
 export type MaetrikConfigInput = z.input<typeof maetrikConfigSchema>;
 

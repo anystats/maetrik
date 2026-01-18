@@ -37,3 +37,12 @@ storage:
   driver: sqlite
   path: ./data/maetrik.db
 
+# State database (internal server storage)
+# For npm/local: uses PGLite (embedded)
+stateDatabase:
+  type: pglite
+  path: ./data/state.db
+  # For Docker: use PostgreSQL
+  # type: postgres
+  # connectionString: ${STATE_DATABASE_URL}
+

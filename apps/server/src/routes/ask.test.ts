@@ -2,47 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 import type { Express } from 'express';
+import type { DataSourceManager, DataSourceDriver } from '@maetrik/core';
 
 // Mock core modules
 vi.mock('@maetrik/core', () => ({
-  createDriverRegistry: vi.fn(() => ({
-    register: vi.fn(),
-    get: vi.fn(),
-    list: vi.fn(() => ['postgres']),
-    createDriver: vi.fn(),
-  })),
-  createDriverManager: vi.fn(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    getDriver: vi.fn((name: string) => {
-      if (name === 'main') {
-        return {
-          name: 'postgres',
-          dialect: 'postgresql',
-          healthCheck: vi.fn().mockResolvedValue(true),
-          introspect: vi.fn().mockResolvedValue({
-            tables: {
-              users: {
-                name: 'users',
-                columns: [
-                  { name: 'id', type: 'uuid', nullable: false, primaryKey: true },
-                  { name: 'email', type: 'varchar', nullable: false },
-                ],
-              },
-            },
-          }),
-          execute: vi.fn().mockResolvedValue({
-            columns: ['count'],
-            rows: [{ count: 42 }],
-            rowCount: 1,
-          }),
-        };
-      }
-      return undefined;
-    }),
-    healthCheck: vi.fn().mockResolvedValue(true),
-    shutdown: vi.fn().mockResolvedValue(undefined),
-  })),
-  postgresDriverFactory: { name: 'postgres', dialect: 'postgresql', create: vi.fn() },
   createLLMRegistry: vi.fn(() => ({
     register: vi.fn(),
     get: vi.fn(),
@@ -79,56 +42,71 @@ vi.mock('@maetrik/core', () => ({
   })),
 }));
 
+const createMockDataSource = (): DataSourceDriver => ({
+  name: 'main',
+  type: 'postgres',
+  init: vi.fn().mockResolvedValue(undefined),
+  shutdown: vi.fn().mockResolvedValue(undefined),
+  capabilities: () => ({
+    queryable: true,
+    introspectable: true,
+    healthCheckable: true,
+    transactional: true,
+  }),
+  isQueryable: (() => true) as DataSourceDriver['isQueryable'],
+  isIntrospectable: (() => true) as DataSourceDriver['isIntrospectable'],
+  isHealthCheckable: (() => true) as DataSourceDriver['isHealthCheckable'],
+  isTransactional: (() => true) as DataSourceDriver['isTransactional'],
+  healthCheck: vi.fn().mockResolvedValue(true),
+  introspect: vi.fn().mockResolvedValue({
+    tables: [
+      {
+        name: 'users',
+        schema: 'public',
+        columns: [
+          { name: 'id', type: 'uuid', nullable: false, isPrimaryKey: true },
+          { name: 'email', type: 'varchar', nullable: false, isPrimaryKey: false },
+        ],
+      },
+    ],
+  }),
+  execute: vi.fn().mockResolvedValue({
+    rows: [{ count: 42 }],
+    rowCount: 1,
+    fields: [{ name: 'count' }],
+  }),
+});
+
 describe('Ask API', () => {
   let app: Express;
+  let mockDataSource: ReturnType<typeof createMockDataSource>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const mockDriverManager = {
-      initialize: vi.fn().mockResolvedValue(undefined),
-      getDriver: vi.fn((name: string) => {
-        if (name === 'main') {
-          return {
-            name: 'postgres',
-            dialect: 'postgresql',
-            healthCheck: vi.fn().mockResolvedValue(true),
-            introspect: vi.fn().mockResolvedValue({
-              tables: {
-                users: {
-                  name: 'users',
-                  columns: [
-                    { name: 'id', type: 'uuid', nullable: false, primaryKey: true },
-                    { name: 'email', type: 'varchar', nullable: false },
-                  ],
-                },
-              },
-            }),
-            execute: vi.fn().mockResolvedValue({
-              columns: ['count'],
-              rows: [{ count: 42 }],
-              rowCount: 1,
-            }),
-          };
+    mockDataSource = createMockDataSource();
+
+    const mockDataSourceManager: DataSourceManager = {
+      addConfig: vi.fn(),
+      removeConfig: vi.fn(),
+      getConfig: vi.fn((id: string) =>
+        id === 'main' ? { id: 'main', type: 'postgres', credentials: {} } : undefined
+      ),
+      listConfigs: vi.fn(() => [{ id: 'main', type: 'postgres', credentials: {} }]),
+      get: vi.fn((id: string) => {
+        if (id === 'main') {
+          return Promise.resolve(mockDataSource);
         }
-        return undefined;
+        return Promise.resolve(undefined);
       }),
-      healthCheck: vi.fn().mockResolvedValue(true),
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
+
     app = createApp({
-      connections: {
-        main: {
-          driver: 'postgres',
-          host: 'localhost',
-          port: 5432,
-          database: 'test',
-        },
-      },
       llm: {
         driver: 'ollama',
         model: 'llama3',
       },
-      driverManager: mockDriverManager as any,
+      dataSourceManager: mockDataSourceManager,
     });
   });
 

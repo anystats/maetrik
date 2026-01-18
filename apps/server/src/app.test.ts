@@ -1,22 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
+import type { DataSourceManager } from '@maetrik/core';
 
 // Mock core modules
 vi.mock('@maetrik/core', () => ({
-  createDriverRegistry: vi.fn(() => ({
-    register: vi.fn(),
-    get: vi.fn(),
-    list: vi.fn(() => []),
-    createDriver: vi.fn(),
-  })),
-  createDriverManager: vi.fn(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    getDriver: vi.fn(() => undefined),
-    healthCheck: vi.fn().mockResolvedValue(false),
-    shutdown: vi.fn().mockResolvedValue(undefined),
-  })),
-  postgresDriverFactory: { name: 'postgres', dialect: 'postgresql', create: vi.fn() },
   createLLMRegistry: vi.fn(() => ({
     register: vi.fn(),
     get: vi.fn(),
@@ -47,13 +35,15 @@ vi.mock('@maetrik/core', () => ({
 }));
 
 describe('Server App', () => {
-  const mockDriverManager = {
-    initialize: vi.fn().mockResolvedValue(undefined),
-    getDriver: vi.fn(() => undefined),
-    healthCheck: vi.fn().mockResolvedValue(false),
+  const mockDataSourceManager: DataSourceManager = {
+    addConfig: vi.fn(),
+    removeConfig: vi.fn(),
+    getConfig: vi.fn(() => undefined),
+    listConfigs: vi.fn(() => []),
+    get: vi.fn().mockResolvedValue(undefined),
     shutdown: vi.fn().mockResolvedValue(undefined),
   };
-  const app = createApp({ driverManager: mockDriverManager as any });
+  const app = createApp({ dataSourceManager: mockDataSourceManager });
 
   describe('GET /health', () => {
     it('returns 200 with status ok', async () => {
