@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { BaseDataSourceDriver } from './base-driver.js';
-import type {
-  DataSourceCapabilities,
-  DataSourceConfig,
-  Queryable,
-  Introspectable,
-  HealthCheckable,
-  Transactional,
-  DataSourceQueryResult as QueryResult,
-  DataSourceSchemaDefinition as SchemaDefinition,
-  Transaction,
+import {
+  BaseDataSourceDriver,
+  type DataSourceCapabilities,
+  type DataSourceConfig,
+  type Queryable,
+  type Introspectable,
+  type HealthCheckable,
+  type Transactional,
+  type DataSourceQueryResult as QueryResult,
+  type DataSourceSchemaDefinition as SchemaDefinition,
+  type Transaction,
 } from '@maetrik/shared';
 
 class TestQueryableDriver extends BaseDataSourceDriver implements Queryable {

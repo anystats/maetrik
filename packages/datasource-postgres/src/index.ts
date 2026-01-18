@@ -1,18 +1,18 @@
 import pg from 'pg';
 import { z } from 'zod';
-import { BaseDataSourceDriver } from '@maetrik/core';
-import type {
-  DataSourceFactory,
-  DataSourceConfig,
-  DataSourceCapabilities,
-  DataSourceQueryResult as QueryResult,
-  DataSourceSchemaDefinition as SchemaDefinition,
-  DataSourceSchemaTable as SchemaTable,
-  Transaction,
-  Queryable,
-  Introspectable,
-  HealthCheckable,
-  Transactional,
+import {
+  BaseDataSourceDriver,
+  type DataSourceFactory,
+  type DataSourceConfig,
+  type DataSourceCapabilities,
+  type DataSourceQueryResult as QueryResult,
+  type DataSourceSchemaDefinition as SchemaDefinition,
+  type DataSourceSchemaTable as SchemaTable,
+  type Transaction,
+  type Queryable,
+  type Introspectable,
+  type HealthCheckable,
+  type Transactional,
 } from '@maetrik/shared';
 
 const { Client } = pg;

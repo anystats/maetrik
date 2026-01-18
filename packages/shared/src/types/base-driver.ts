@@ -6,7 +6,7 @@ import type {
   Introspectable,
   HealthCheckable,
   Transactional,
-} from '@maetrik/shared';
+} from './datasource.js';
 
 export abstract class BaseDataSourceDriver implements DataSourceDriver {
   abstract readonly name: string;

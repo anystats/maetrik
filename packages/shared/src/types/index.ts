@@ -24,3 +24,6 @@ export {
   type SchemaTable as DataSourceSchemaTable,
   type SchemaDefinition as DataSourceSchemaDefinition,
 } from './datasource.js';
+
+// Base class for data source drivers
+export { BaseDataSourceDriver } from './base-driver.js';
