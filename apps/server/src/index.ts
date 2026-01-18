@@ -1,6 +1,6 @@
 import { createApp, getAppContext } from './app.js';
 import { loadConfig, createLogger } from '@maetrik/shared';
-import { createDriverManagerFromConfig } from '@maetrik/core';
+import { createDriverManagerFromConfig, createDataSourceManagerFromConfig } from '@maetrik/core';
 
 const logger = createLogger('server');
 
@@ -9,10 +9,20 @@ async function main() {
 
   const driverManager = await createDriverManagerFromConfig(config.connections, logger);
 
+  // Convert dataSources config to DataSourceConfig format
+  const dataSourceConfigs = config.dataSources.map((ds) => ({
+    id: ds.id,
+    type: ds.type,
+    credentials: ds.credentials,
+  }));
+  const dataSourceManager = await createDataSourceManagerFromConfig(dataSourceConfigs, logger);
+
   const app = createApp({
     connections: config.connections,
+    dataSources: config.dataSources,
     llm: config.llm,
     driverManager,
+    dataSourceManager,
   });
 
   const context = getAppContext(app);
@@ -77,6 +87,15 @@ async function main() {
         logger.info('Database connections closed');
       } catch (error) {
         logger.warn('Error shutting down database', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        await dataSourceManager.shutdown();
+        logger.info('Data sources closed');
+      } catch (error) {
+        logger.warn('Error shutting down data sources', {
           error: error instanceof Error ? error.message : String(error),
         });
       }

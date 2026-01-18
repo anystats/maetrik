@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import type { ConnectionConfig, LLMConfig } from '@maetrik/shared';
+import type { ConnectionConfig, LLMConfig, DataSourceConfig } from '@maetrik/shared';
 import {
   createLLMRegistry,
   createLLMManager,
@@ -10,6 +10,7 @@ import {
   type LLMManager,
   type QueryTranslator,
   type SemanticLayer,
+  type DataSourceManager,
 } from '@maetrik/core';
 import { createConnectionsRouter } from './routes/connections.js';
 import { createQueryRouter } from './routes/query.js';
@@ -19,12 +20,15 @@ const startTime = Date.now();
 
 export interface AppOptions {
   connections?: Record<string, ConnectionConfig>;
+  dataSources?: DataSourceConfig[];
   llm?: LLMConfig;
   driverManager: DriverManager;
+  dataSourceManager?: DataSourceManager;
 }
 
 export interface AppContext {
   driverManager: DriverManager;
+  dataSourceManager?: DataSourceManager;
   llmManager: LLMManager;
   queryTranslator: QueryTranslator;
   semanticLayers: Map<string, SemanticLayer>;
@@ -32,7 +36,7 @@ export interface AppContext {
 
 export function createApp(options: AppOptions): express.Express {
   const app = express();
-  const { connections = {}, llm, driverManager } = options;
+  const { connections = {}, dataSources = [], llm, driverManager, dataSourceManager } = options;
 
   // Setup LLM registry and manager
   const llmRegistry = createLLMRegistry();
@@ -50,6 +54,7 @@ export function createApp(options: AppOptions): express.Express {
   // Store context on app
   const context: AppContext = {
     driverManager,
+    dataSourceManager,
     llmManager,
     queryTranslator,
     semanticLayers,
