@@ -8,6 +8,7 @@ export interface Connection {
   type: string;
   name?: string;
   description?: string;
+  enabled: boolean;
 }
 
 export interface ConnectionDetails extends Connection {
@@ -26,6 +27,7 @@ export interface UpdateConnectionInput {
   credentials?: Record<string, unknown>;
   name?: string;
   description?: string;
+  enabled?: boolean;
 }
 
 export interface HealthCheckResult {
@@ -114,7 +116,9 @@ export async function testConnection(id: string): Promise<HealthCheckResult> {
 // Data source types
 export interface DataSourceType {
   type: string;
-  label: string;
+  name: string;
+  description?: string;
+  image?: string;  // Base64 data URI
 }
 
 export async function listDataSourceTypes(): Promise<DataSourceType[]> {

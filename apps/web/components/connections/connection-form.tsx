@@ -72,7 +72,7 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
       } catch (err) {
         console.error("Failed to load data source types:", err);
         // Fallback to default types
-        setDataSourceTypes([{ type: "postgres", label: "PostgreSQL" }]);
+        setDataSourceTypes([{ type: "postgres", name: "PostgreSQL" }]);
         if (mode === "create" && !formData.type) {
           setFormData((prev) => ({ ...prev, type: "postgres" }));
         }
@@ -242,7 +242,7 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
                   <SelectContent>
                     {dataSourceTypes.map((ds) => (
                       <SelectItem key={ds.type} value={ds.type}>
-                        {ds.label}
+                        {ds.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

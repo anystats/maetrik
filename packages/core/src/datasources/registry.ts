@@ -1,22 +1,23 @@
-import type { DataSourceFactory } from '@maetrik/shared';
+import type { DataSourceFactory, ResolvedDataSourceFactory } from '@maetrik/shared';
 import type { DataSourceRegistry } from './types.js';
 
 export function createDataSourceRegistry(): DataSourceRegistry {
-  const factories = new Map<string, DataSourceFactory>();
+  const factories = new Map<string, ResolvedDataSourceFactory>();
 
   return {
-    register(factory: DataSourceFactory): void {
+    register(factory: DataSourceFactory | ResolvedDataSourceFactory): void {
       if (factories.has(factory.type)) {
         throw new Error(`Data source factory '${factory.type}' is already registered`);
       }
-      factories.set(factory.type, factory);
+      // Store as ResolvedDataSourceFactory - unresolved factories just won't have icon
+      factories.set(factory.type, factory as ResolvedDataSourceFactory);
     },
 
-    get(type: string): DataSourceFactory | undefined {
+    get(type: string): ResolvedDataSourceFactory | undefined {
       return factories.get(type);
     },
 
-    list(): DataSourceFactory[] {
+    list(): ResolvedDataSourceFactory[] {
       return Array.from(factories.values());
     },
 

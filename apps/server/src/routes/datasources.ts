@@ -1,33 +1,23 @@
 import { Router, Request, Response } from 'express';
-import type { DataSourceManager, DataSourceRegistry } from '@maetrik/core';
+import type { DataSourceManager } from '@maetrik/core';
 
 export interface DataSourcesRouterOptions {
   dataSourceManager: DataSourceManager;
-  registry?: DataSourceRegistry;
 }
 
 export function createDataSourcesRouter(options: DataSourcesRouterOptions): Router {
   const router = Router();
-  const { dataSourceManager, registry } = options;
+  const { dataSourceManager } = options;
 
   // GET /api/v1/datasources/types - List available data source types
   router.get('/types', (_req: Request, res: Response) => {
-    if (registry) {
-      const factories = registry.list();
-      const types = factories.map((f) => ({
-        type: f.type,
-        label: f.type.charAt(0).toUpperCase() + f.type.slice(1),
-      }));
-      res.json({ success: true, data: types });
-    } else {
-      // Fallback to known types if registry not provided
-      res.json({
-        success: true,
-        data: [
-          { type: 'postgres', label: 'PostgreSQL' },
-        ],
-      });
-    }
+    const types = dataSourceManager.listTypes().map((t) => ({
+      type: t.type,
+      name: t.displayName,
+      description: t.description,
+      image: t.icon,
+    }));
+    res.json({ success: true, data: types });
   });
 
   // GET /api/v1/datasources - List all data sources

@@ -1,11 +1,18 @@
-import type { DataSourceFactory, DataSourceDriver, DataSourceConfig } from '@maetrik/shared';
+import type { DataSourceFactory, ResolvedDataSourceFactory, DataSourceDriver, DataSourceConfig } from '@maetrik/shared';
 import type { ConnectionConfigResolver } from '../connections/types.js';
 
 export interface DataSourceRegistry {
-  register(factory: DataSourceFactory): void;
-  get(type: string): DataSourceFactory | undefined;
-  list(): DataSourceFactory[];
+  register(factory: DataSourceFactory | ResolvedDataSourceFactory): void;
+  get(type: string): ResolvedDataSourceFactory | undefined;
+  list(): ResolvedDataSourceFactory[];
   has(type: string): boolean;
+}
+
+export interface DataSourceTypeInfo {
+  type: string;
+  displayName: string;
+  description?: string;
+  icon?: string;  // Base64 data URI
 }
 
 export interface DataSourceManager {
@@ -20,6 +27,9 @@ export interface DataSourceManager {
 
   // For API validation
   canAddToDatabase(id: string): Promise<boolean>;
+
+  // Registry access
+  listTypes(): DataSourceTypeInfo[];
 }
 
 export interface DataSourceManagerOptions {

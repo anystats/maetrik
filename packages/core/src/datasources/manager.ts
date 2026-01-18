@@ -1,5 +1,5 @@
 import type { DataSourceDriver, DataSourceConfig } from '@maetrik/shared';
-import type { DataSourceManager, DataSourceManagerOptions } from './types.js';
+import type { DataSourceManager, DataSourceManagerOptions, DataSourceTypeInfo } from './types.js';
 import { DriverNotFoundError } from '../connections/errors.js';
 
 export function createDataSourceManager(options: DataSourceManagerOptions): DataSourceManager {
@@ -38,6 +38,15 @@ export function createDataSourceManager(options: DataSourceManagerOptions): Data
 
     async canAddToDatabase(id: string): Promise<boolean> {
       return !(await resolver.existsInOtherSources(id, 'database'));
+    },
+
+    listTypes(): DataSourceTypeInfo[] {
+      return registry.list().map((factory) => ({
+        type: factory.type,
+        displayName: factory.displayName,
+        description: factory.description,
+        icon: factory.icon,
+      }));
     },
   };
 }
