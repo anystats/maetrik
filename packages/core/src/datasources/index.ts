@@ -7,4 +7,7 @@ export {
   type DiscoveredDataSource,
   type AutodiscoverResult as DataSourceAutodiscoverResult,
 } from './autodiscover.js';
-export { createDataSourceManagerFromConfig } from './from-config.js';
+export {
+  createDataSourceManagerFromConfig,
+  type CreateDataSourceManagerOptions,
+} from './from-config.js';
