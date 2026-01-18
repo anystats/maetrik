@@ -59,7 +59,7 @@ importers:
         version: link:../shared
       openai:
         specifier: ^6.16.0
-        version: 6.16.0
+        version: 6.16.0(zod@4.3.5)
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -70,6 +70,9 @@ importers:
       vitest:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.30)
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.5
 
   packages/driver-postgres:
     dependencies:
@@ -1770,7 +1773,7 @@ packages:
       mimic-fn: 4.0.0
     dev: true
 
-  /openai@6.16.0:
+  /openai@6.16.0(zod@4.3.5):
     resolution: {integrity: sha512-fZ1uBqjFUjXzbGc35fFtYKEOxd20kd9fDpFeqWtsOZWiubY8CZ1NAlXHW3iathaFvqmNtCWMIsosCuyeI7Joxg==}
     hasBin: true
     peerDependencies:
@@ -1781,6 +1784,8 @@ packages:
         optional: true
       zod:
         optional: true
+    dependencies:
+      zod: 4.3.5
     dev: false
 
   /p-limit@5.0.0:
@@ -2697,4 +2702,3 @@ packages:
 
   /zod@4.3.5:
     resolution: {integrity: sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g==}
-    dev: false
