@@ -8,14 +8,20 @@
   },
   "scripts": {
     "dev": "turbo dev",
+    "dev:stop": "lsof -ti:3000,3001 | xargs kill -9 2>/dev/null || true; pkill -9 -f 'turbo.*dev' || true",
     "build": "turbo build",
     "test": "turbo test",
     "test:unit": "turbo test:unit",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
-    "clean": "turbo clean && rm -rf node_modules"
+    "clean": "turbo clean && rm -rf node_modules",
+    "seed": "tsx tools/seed-postgres.ts",
+    "seed:drop": "tsx tools/seed-postgres.ts --drop"
   },
   "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "pg": "^8.11.0",
+    "tsx": "^4.7.0",
     "turbo": "^2.0.0",
     "typescript": "^5.3.0"
   }

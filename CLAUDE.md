@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Maetrik is a natural language data retrieval framework. Users ask questions in plain English, and the system translates them to SQL using an LLM, executes against configured databases, and returns results.
+Maetrik is a natural language data retrieval framework. Users ask questions in plain English, and the system translates them to the appropriate query language using an LLM, executes against configured data sources, and returns results.
+
+**SQL-targeted, query-language agnostic:** The primary focus is SQL databases (PostgreSQL, MySQL, SQLite, etc.), but the architecture is designed to support other query languages (MongoDB's MQL, Neo4j's Cypher, GraphQL, etc.) without breaking changes. SQL is the default and optimized path; other query languages are considered "exotic" extensions.
 
 ## Commands
 
@@ -62,6 +64,7 @@ Build order matters due to dependencies:
 - `autodiscover.ts` - Auto-discovers `@maetrik/datasource-*` packages
 - `base-driver.ts` - Abstract base class with type guard methods
 - Capability-based interfaces: `Queryable`, `Introspectable`, `HealthCheckable`, `Transactional`
+- Drivers declare `queryLanguage` (sql, mql, cypher, etc.) for LLM/translator awareness
 
 **Connection Config Resolver** (`packages/core/src/connections/`):
 - `sources/file.ts` - Loads connections from config file (read-only)
@@ -81,10 +84,10 @@ Build order matters due to dependencies:
 - Add new providers by implementing `LLMDriver` interface
 
 **Query Translation Flow** (`packages/core/src/query/`):
-1. `SemanticLayer` introspects database schema
-2. `QueryTranslator` builds prompts with schema context
-3. LLM generates SQL with explanation and confidence
-4. SQL validated (SELECT-only) before execution
+1. `SemanticLayer` introspects data source schema
+2. `QueryTranslator` builds prompts with schema context and target query language
+3. LLM generates query (SQL for relational DBs, or native query language for others) with explanation and confidence
+4. Query validated before execution (SELECT-only for SQL)
 
 ### API Endpoints (apps/server)
 

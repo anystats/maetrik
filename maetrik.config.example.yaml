@@ -5,15 +5,18 @@ server:
   port: 3000
   host: localhost
 
-# Database connections
-connections:
-  main:
-    driver: postgres
-    host: localhost
-    port: 5432
-    database: myapp
-    user: ${DB_USER}
-    password: ${DB_PASSWORD}
+# Data sources (database connections defined in config file)
+# These are read-only and cannot be modified via the API
+# Use the API to create additional connections stored in the state database
+dataSources:
+  - id: main
+    type: postgres
+    credentials:
+      host: localhost
+      port: 5432
+      database: myapp
+      user: ${DB_USER}
+      password: ${DB_PASSWORD}
 
 # LLM provider
 llm:

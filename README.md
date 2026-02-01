@@ -1,6 +1,8 @@
 # maetrik
 
-Natural language data retrieval framework. Ask questions, get answers from your database.
+Natural language data retrieval framework. Ask questions in plain English, get answers from your data sources.
+
+**SQL-targeted, query-language agnostic.** Primary focus is SQL databases (PostgreSQL, MySQL, etc.), with an extensible architecture that doesn't lock out future support for other query languages (MongoDB, Neo4j, etc.).
 
 ## Quick Start
 
@@ -66,11 +68,14 @@ docker build -f docker/Dockerfile -t maetrik .
 ```
 maetrik/
 ├── apps/
-│   └── server/          # API server
+│   ├── server/              # Express API server
+│   └── web/                 # Next.js frontend (in development)
 ├── packages/
-│   └── shared/          # Types, config, logger
-├── docker/              # Docker configuration
-└── docs/                # Documentation
+│   ├── shared/              # Types, config, logger
+│   ├── core/                # Business logic, data sources, LLM, query translation
+│   └── datasource-postgres/ # PostgreSQL driver (reference implementation)
+├── docker/                  # Docker configuration
+└── docs/                    # Documentation
 ```
 
 ## License
