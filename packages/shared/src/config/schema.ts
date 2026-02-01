@@ -32,10 +32,18 @@ export const authConfigSchema = z.object({
   sessionSecret: z.string().optional(),
 });
 
+export const connectionOptionsSchema = z.object({
+  timeoutMs: z.number().positive().default(30000),
+  idleTimeoutMs: z.number().positive().default(60000),
+  maxRetries: z.number().nonnegative().default(0),
+  retryDelayMs: z.number().positive().default(1000),
+}).partial();
+
 export const dataSourceConfigSchema = z.object({
   id: z.string(),
   type: z.string(),
   credentials: z.record(z.string(), z.any()),
+  connection: connectionOptionsSchema.optional(),
 });
 
 export const stateStorageConfigSchema = z.object({

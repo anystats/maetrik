@@ -51,6 +51,12 @@ export interface Transactional {
 // Core Interfaces
 // ============================================
 
+/**
+ * Query language that a driver speaks.
+ * Used by LLM/translator to know what syntax to generate.
+ */
+export type QueryLanguage = 'sql' | 'mql' | 'cypher' | 'graphql' | 'custom';
+
 export interface DataSourceCapabilities {
   queryable: boolean;
   introspectable: boolean;
@@ -58,21 +64,40 @@ export interface DataSourceCapabilities {
   transactional: boolean;
 }
 
+/**
+ * Connection behavior options owned by Maetrik (not driver-specific).
+ * Applied consistently across all drivers at the manager level.
+ */
+export interface ConnectionOptions {
+  /** Connection timeout in milliseconds (default: 30000) */
+  timeoutMs?: number;
+  /** Close idle connections after this many milliseconds (default: 60000) */
+  idleTimeoutMs?: number;
+  /** Number of times to retry failed connections (default: 0) */
+  maxRetries?: number;
+  /** Delay between retries in milliseconds (default: 1000) */
+  retryDelayMs?: number;
+}
+
 export interface DataSourceConfig {
   id: string;
   type: string;
+  /** Driver-specific credentials (host, port, auth, etc.) */
   credentials: Record<string, unknown>;
+  /** Maetrik-level connection behavior (timeout, retry, etc.) */
+  connection?: ConnectionOptions;
 }
 
 export interface DataSourceDriver {
   readonly name: string;
   readonly type: string;
+  /** Query language this driver speaks (e.g., 'sql', 'mql', 'cypher') */
+  readonly queryLanguage: QueryLanguage;
 
   init(config: DataSourceConfig): Promise<void>;
   shutdown(): Promise<void>;
-  capabilities(): DataSourceCapabilities;
 
-  // Type guard methods
+  // Type guard methods - check actual implementation, not declaration
   isQueryable(): this is DataSourceDriver & Queryable;
   isIntrospectable(): this is DataSourceDriver & Introspectable;
   isHealthCheckable(): this is DataSourceDriver & HealthCheckable;
@@ -96,12 +121,18 @@ export type CredentialsFieldDefinitions = Record<string, CredentialsFieldDefinit
 // Factory Interfaces
 // ============================================
 
+import type { JSONSchema7 } from 'json-schema';
+
+/**
+ * Factory provided by driver packages.
+ * Capabilities are derived from implementation at registration time.
+ * No capability declaration needed - implementation IS the contract.
+ */
 export interface DataSourceFactory {
   readonly type: string;
   readonly displayName: string;
-  readonly capabilities: DataSourceCapabilities;
-  // Using unknown to support multiple zod versions
-  readonly credentialsSchema: unknown;
+  /** JSON Schema for credentials validation (standard, portable format) */
+  readonly credentialsSchema: JSONSchema7;
   create(): DataSourceDriver;
 
   // Optional metadata for UI
@@ -110,12 +141,18 @@ export interface DataSourceFactory {
   readonly credentialsFields?: CredentialsFieldDefinitions;
 }
 
+/**
+ * Factory after registration with derived capabilities and converted schema.
+ * Capabilities are probed from driver instance at registration time.
+ */
 export interface ResolvedDataSourceFactory {
   readonly type: string;
   readonly displayName: string;
   readonly description?: string;
   readonly icon?: string;  // Base64 data URI, e.g., "data:image/png;base64,..."
+  /** Capabilities derived from driver implementation at registration */
   readonly capabilities: DataSourceCapabilities;
+  /** Zod schema converted from JSON Schema for internal validation */
   readonly credentialsSchema: unknown;
   readonly credentialsFields?: CredentialsFieldDefinitions;
   create(): DataSourceDriver;

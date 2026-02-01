@@ -22,17 +22,11 @@ describe('PostgresDataSource', () => {
       expect(dataSourceFactory.displayName).toBe('PostgreSQL');
     });
 
-    it('has capabilities', () => {
-      expect(dataSourceFactory.capabilities).toEqual({
-        queryable: true,
-        introspectable: true,
-        healthCheckable: true,
-        transactional: true,
-      });
-    });
-
-    it('has credentials schema', () => {
+    it('has JSON Schema for credentials', () => {
       expect(dataSourceFactory.credentialsSchema).toBeDefined();
+      expect(dataSourceFactory.credentialsSchema.type).toBe('object');
+      expect(dataSourceFactory.credentialsSchema.required).toContain('host');
+      expect(dataSourceFactory.credentialsSchema.required).toContain('database');
     });
 
     it('creates a driver instance', () => {
@@ -64,13 +58,8 @@ describe('PostgresDataSource', () => {
       expect(driver.type).toBe('postgres');
     });
 
-    it('reports all capabilities', () => {
-      expect(driver.capabilities()).toEqual({
-        queryable: true,
-        introspectable: true,
-        healthCheckable: true,
-        transactional: true,
-      });
+    it('has sql query language', () => {
+      expect(driver.queryLanguage).toBe('sql');
     });
 
     it('type guards return correct values', () => {

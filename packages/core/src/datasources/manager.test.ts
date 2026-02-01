@@ -5,36 +5,33 @@ import { CompositeConnectionConfigResolver } from '../connections/resolver.js';
 import { FileConnectionConfigSource } from '../connections/sources/file.js';
 import { ConnectionNotFoundError, DriverNotFoundError } from '../connections/errors.js';
 import type { DataSourceManager, DataSourceRegistry } from './types.js';
-import type { DataSourceFactory, DataSourceDriver, DataSourceConfig } from '@maetrik/shared';
-import { z } from 'zod';
+import type { DataSourceFactory, DataSourceDriver, DataSourceConfig, QueryLanguage } from '@maetrik/shared';
+import type { JSONSchema7 } from 'json-schema';
 
 const createMockDriver = (): DataSourceDriver => ({
   name: 'test-instance',
   type: 'mock',
+  queryLanguage: 'sql' as QueryLanguage,
   init: vi.fn().mockResolvedValue(undefined),
   shutdown: vi.fn().mockResolvedValue(undefined),
-  capabilities: () => ({
-    queryable: true,
-    introspectable: false,
-    healthCheckable: true,
-    transactional: false,
-  }),
   isQueryable: (() => true) as DataSourceDriver['isQueryable'],
   isIntrospectable: (() => false) as DataSourceDriver['isIntrospectable'],
   isHealthCheckable: (() => true) as DataSourceDriver['isHealthCheckable'],
   isTransactional: (() => false) as DataSourceDriver['isTransactional'],
 });
 
+const mockCredentialsSchema: JSONSchema7 = {
+  type: 'object',
+  required: ['host'],
+  properties: {
+    host: { type: 'string' },
+  },
+};
+
 const mockFactory: DataSourceFactory = {
   type: 'mock',
   displayName: 'Mock Database',
-  capabilities: {
-    queryable: true,
-    introspectable: false,
-    healthCheckable: true,
-    transactional: false,
-  },
-  credentialsSchema: z.object({ host: z.string() }),
+  credentialsSchema: mockCredentialsSchema,
   create: vi.fn().mockImplementation(createMockDriver),
 };
 
@@ -51,6 +48,9 @@ describe('DataSourceManager', () => {
     vi.clearAllMocks();
     registry = createDataSourceRegistry();
     registry.register(mockFactory);
+
+    // Clear mocks after registration since registry probes driver for capabilities
+    vi.clearAllMocks();
 
     const fileSource = new FileConnectionConfigSource(testConfigs);
     const resolver = new CompositeConnectionConfigResolver([fileSource]);
@@ -101,6 +101,15 @@ describe('DataSourceManager', () => {
     it('throws DriverNotFoundError for unknown type', async () => {
       const unknownConfig = { id: 'x', type: 'unknown', credentials: {} };
       await expect(manager.connect(unknownConfig)).rejects.toThrow(DriverNotFoundError);
+    });
+
+    it('applies timeout from connection options', async () => {
+      const configWithTimeout: DataSourceConfig = {
+        ...testConfigs[0],
+        connection: { timeoutMs: 5000 },
+      };
+      const driver = await manager.connect(configWithTimeout);
+      expect(driver.init).toHaveBeenCalled();
     });
   });
 

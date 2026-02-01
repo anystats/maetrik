@@ -14,6 +14,8 @@ export {
   type Transactional,
   type Transaction,
   // Core interfaces
+  type QueryLanguage,
+  type ConnectionOptions,
   type DataSourceCapabilities,
   type DataSourceConfig,
   type DataSourceDriver,
@@ -31,3 +33,6 @@ export {
 
 // Base class for data source drivers
 export { BaseDataSourceDriver } from './base-driver.js';
+
+// Error types
+export { DataSourceError, type CoreErrorCode, type DataSourceErrorOptions } from './errors.js';

@@ -1,19 +1,33 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { autodiscoverDataSources, isValidDataSourceFactory } from './autodiscover.js';
-import type { DataSourceFactory } from '@maetrik/shared';
-import { z } from 'zod';
+import type { DataSourceFactory, DataSourceDriver, QueryLanguage } from '@maetrik/shared';
+import type { JSONSchema7 } from 'json-schema';
+
+// Mock driver for factory.create()
+class MockDriver implements DataSourceDriver {
+  readonly name = 'test';
+  readonly type = 'test';
+  readonly queryLanguage: QueryLanguage = 'sql';
+
+  async init() {}
+  async shutdown() {}
+
+  isQueryable(): this is DataSourceDriver & import('@maetrik/shared').Queryable { return true; }
+  isIntrospectable(): this is DataSourceDriver & import('@maetrik/shared').Introspectable { return false; }
+  isHealthCheckable(): this is DataSourceDriver & import('@maetrik/shared').HealthCheckable { return false; }
+  isTransactional(): this is DataSourceDriver & import('@maetrik/shared').Transactional { return false; }
+}
+
+const mockCredentialsSchema: JSONSchema7 = {
+  type: 'object',
+  properties: {},
+};
 
 const validFactory: DataSourceFactory = {
   type: 'test',
   displayName: 'Test Database',
-  capabilities: {
-    queryable: true,
-    introspectable: true,
-    healthCheckable: true,
-    transactional: false,
-  },
-  credentialsSchema: z.object({}),
-  create: () => ({} as any),
+  credentialsSchema: mockCredentialsSchema,
+  create: () => new MockDriver(),
 };
 
 describe('isValidDataSourceFactory', () => {
@@ -31,8 +45,8 @@ describe('isValidDataSourceFactory', () => {
     expect(isValidDataSourceFactory(invalid)).toBe(false);
   });
 
-  it('returns false if capabilities is missing', () => {
-    const { capabilities, ...invalid } = validFactory;
+  it('returns false if credentialsSchema is missing', () => {
+    const { credentialsSchema, ...invalid } = validFactory;
     expect(isValidDataSourceFactory(invalid)).toBe(false);
   });
 

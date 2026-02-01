@@ -1,7 +1,7 @@
 import type {
   DataSourceDriver,
-  DataSourceCapabilities,
   DataSourceConfig,
+  QueryLanguage,
   Queryable,
   Introspectable,
   HealthCheckable,
@@ -11,24 +11,26 @@ import type {
 export abstract class BaseDataSourceDriver implements DataSourceDriver {
   abstract readonly name: string;
   abstract readonly type: string;
+  abstract readonly queryLanguage: QueryLanguage;
 
   abstract init(config: DataSourceConfig): Promise<void>;
   abstract shutdown(): Promise<void>;
-  abstract capabilities(): DataSourceCapabilities;
 
+  // Type guards check actual implementation, not declaration
+  // This eliminates capability declaration lying
   isQueryable(): this is this & Queryable {
-    return this.capabilities().queryable;
+    return typeof (this as unknown as Queryable).execute === 'function';
   }
 
   isIntrospectable(): this is this & Introspectable {
-    return this.capabilities().introspectable;
+    return typeof (this as unknown as Introspectable).introspect === 'function';
   }
 
   isHealthCheckable(): this is this & HealthCheckable {
-    return this.capabilities().healthCheckable;
+    return typeof (this as unknown as HealthCheckable).healthCheck === 'function';
   }
 
   isTransactional(): this is this & Transactional {
-    return this.capabilities().transactional;
+    return typeof (this as unknown as Transactional).beginTransaction === 'function';
   }
 }

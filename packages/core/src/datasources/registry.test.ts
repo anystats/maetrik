@@ -1,20 +1,41 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createDataSourceRegistry } from './registry.js';
 import type { DataSourceRegistry } from './types.js';
-import type { DataSourceFactory, DataSourceDriver } from '@maetrik/shared';
-import { z } from 'zod';
+import type { DataSourceFactory, DataSourceDriver, QueryLanguage, Queryable, Introspectable, HealthCheckable } from '@maetrik/shared';
+import type { JSONSchema7 } from 'json-schema';
+
+// Mock driver that implements Queryable, Introspectable, and HealthCheckable
+class MockDriver implements DataSourceDriver, Queryable, Introspectable, HealthCheckable {
+  readonly name = 'mock';
+  readonly type = 'mock';
+  readonly queryLanguage: QueryLanguage = 'sql';
+
+  async init() {}
+  async shutdown() {}
+
+  isQueryable(): this is DataSourceDriver & Queryable { return true; }
+  isIntrospectable(): this is DataSourceDriver & Introspectable { return true; }
+  isHealthCheckable(): this is DataSourceDriver & HealthCheckable { return true; }
+  isTransactional(): this is DataSourceDriver & import('@maetrik/shared').Transactional { return false; }
+
+  async execute() { return { rows: [], rowCount: 0, fields: [] }; }
+  async introspect() { return { tables: [] }; }
+  async healthCheck() { return true; }
+}
+
+const mockCredentialsSchema: JSONSchema7 = {
+  type: 'object',
+  required: ['host'],
+  properties: {
+    host: { type: 'string' },
+  },
+};
 
 const mockFactory: DataSourceFactory = {
   type: 'mock',
   displayName: 'Mock Database',
-  capabilities: {
-    queryable: true,
-    introspectable: true,
-    healthCheckable: true,
-    transactional: false,
-  },
-  credentialsSchema: z.object({ host: z.string() }),
-  create: () => ({} as DataSourceDriver),
+  credentialsSchema: mockCredentialsSchema,
+  create: () => new MockDriver(),
 };
 
 describe('DataSourceRegistry', () => {
@@ -34,13 +55,25 @@ describe('DataSourceRegistry', () => {
       registry.register(mockFactory);
       expect(() => registry.register(mockFactory)).toThrow();
     });
+
+    it('derives capabilities from driver implementation', () => {
+      registry.register(mockFactory);
+      const resolved = registry.get('mock');
+      expect(resolved?.capabilities).toEqual({
+        queryable: true,
+        introspectable: true,
+        healthCheckable: true,
+        transactional: false,
+      });
+    });
   });
 
   describe('get', () => {
     it('returns registered factory', () => {
       registry.register(mockFactory);
       const factory = registry.get('mock');
-      expect(factory).toBe(mockFactory);
+      expect(factory?.type).toBe('mock');
+      expect(factory?.displayName).toBe('Mock Database');
     });
 
     it('returns undefined for unregistered type', () => {

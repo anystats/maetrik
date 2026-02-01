@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   BaseDataSourceDriver,
-  type DataSourceCapabilities,
   type DataSourceConfig,
+  type QueryLanguage,
   type Queryable,
   type Introspectable,
   type HealthCheckable,
@@ -15,18 +15,10 @@ import {
 class TestQueryableDriver extends BaseDataSourceDriver implements Queryable {
   readonly name = 'test';
   readonly type = 'test';
+  readonly queryLanguage: QueryLanguage = 'sql';
 
   async init(_config: DataSourceConfig): Promise<void> {}
   async shutdown(): Promise<void> {}
-
-  capabilities(): DataSourceCapabilities {
-    return {
-      queryable: true,
-      introspectable: false,
-      healthCheckable: false,
-      transactional: false,
-    };
-  }
 
   async execute(_sql: string, _params?: unknown[]): Promise<QueryResult> {
     return { rows: [], rowCount: 0, fields: [] };
@@ -37,18 +29,10 @@ class TestFullDriver extends BaseDataSourceDriver
   implements Queryable, Introspectable, HealthCheckable, Transactional {
   readonly name = 'full';
   readonly type = 'full';
+  readonly queryLanguage: QueryLanguage = 'sql';
 
   async init(_config: DataSourceConfig): Promise<void> {}
   async shutdown(): Promise<void> {}
-
-  capabilities(): DataSourceCapabilities {
-    return {
-      queryable: true,
-      introspectable: true,
-      healthCheckable: true,
-      transactional: true,
-    };
-  }
 
   async execute(_sql: string, _params?: unknown[]): Promise<QueryResult> {
     return { rows: [], rowCount: 0, fields: [] };

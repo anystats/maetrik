@@ -1,6 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { join, extname } from 'node:path';
-import type { DataSourceFactory, ResolvedDataSourceFactory } from '@maetrik/shared';
+import { join, extname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import type { DataSourceFactory, ResolvedDataSourceFactory, DataSourceCapabilities } from '@maetrik/shared';
+import { JSONSchemaToZod, type JSONSchema } from '@dmitryrechkin/json-schema-to-zod';
 
 export interface DiscoveredDataSource {
   packageName: string;
@@ -19,8 +21,8 @@ export function isValidDataSourceFactory(obj: unknown): obj is DataSourceFactory
   return (
     typeof factory.type === 'string' &&
     typeof factory.displayName === 'string' &&
-    typeof factory.capabilities === 'object' &&
-    factory.capabilities !== null &&
+    typeof factory.credentialsSchema === 'object' &&
+    factory.credentialsSchema !== null &&
     typeof factory.create === 'function'
   );
 }
@@ -55,14 +57,31 @@ async function resolveIcon(iconPath: string, packageName: string): Promise<strin
   }
 }
 
+/**
+ * Probe a driver instance to derive its capabilities.
+ * Checks for actual method implementation rather than declaration.
+ */
+function deriveCapabilities(factory: DataSourceFactory): DataSourceCapabilities {
+  const probe = factory.create();
+  return {
+    queryable: probe.isQueryable(),
+    introspectable: probe.isIntrospectable(),
+    healthCheckable: probe.isHealthCheckable(),
+    transactional: probe.isTransactional(),
+  };
+}
+
 function resolveFactory(factory: DataSourceFactory, icon: string | undefined): ResolvedDataSourceFactory {
+  // Convert JSON Schema to Zod for internal validation
+  const zodSchema = JSONSchemaToZod.convert(factory.credentialsSchema as JSONSchema);
+
   return {
     type: factory.type,
     displayName: factory.displayName,
     description: factory.description,
     icon,
-    capabilities: factory.capabilities,
-    credentialsSchema: factory.credentialsSchema,
+    capabilities: deriveCapabilities(factory),
+    credentialsSchema: zodSchema,
     credentialsFields: factory.credentialsFields,
     create: () => factory.create(),
   };
@@ -78,7 +97,7 @@ async function findDataSourcePackages(): Promise<string[]> {
     try {
       const scopedEntries = await readdir(scopedPath, { withFileTypes: true });
       for (const entry of scopedEntries) {
-        if (entry.isDirectory() && entry.name.startsWith('datasource-')) {
+        if ((entry.isDirectory() || entry.isSymbolicLink()) && entry.name.startsWith('datasource-')) {
           packages.push(`@maetrik/${entry.name}`);
         }
       }
@@ -90,7 +109,7 @@ async function findDataSourcePackages(): Promise<string[]> {
     try {
       const entries = await readdir(nodeModulesPath, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('maetrik-datasource-')) {
+        if ((entry.isDirectory() || entry.isSymbolicLink()) && entry.name.startsWith('maetrik-datasource-')) {
           packages.push(entry.name);
         }
       }
@@ -109,10 +128,23 @@ export async function autodiscoverDataSources(): Promise<AutodiscoverResult> {
   const errors: Array<{ packageName: string; error: string }> = [];
 
   const packageNames = await findDataSourcePackages();
+  const nodeModulesPath = join(process.cwd(), 'node_modules');
 
   for (const packageName of packageNames) {
     try {
-      const module = await import(packageName);
+      // Resolve package path from cwd's node_modules (not from this module's location)
+      const packagePath = packageName.startsWith('@')
+        ? join(nodeModulesPath, ...packageName.split('/'))
+        : join(nodeModulesPath, packageName);
+
+      // Read package.json to find entry point
+      const pkgJsonPath = join(packagePath, 'package.json');
+      const pkgJson = JSON.parse(await readFile(pkgJsonPath, 'utf-8'));
+      const mainEntry = pkgJson.exports?.['.']?.import || pkgJson.main || 'index.js';
+      const entryPath = resolve(packagePath, mainEntry);
+
+      // Import using file:// URL for cross-platform compatibility
+      const module = await import(pathToFileURL(entryPath).href);
       const factory = module.dataSourceFactory;
 
       if (isValidDataSourceFactory(factory)) {
