@@ -36,3 +36,12 @@ export { BaseDataSourceDriver } from './base-driver.js';
 
 // Error types
 export { DataSourceError, type CoreErrorCode, type DataSourceErrorOptions } from './errors.js';
+
+// Encryption types
+export {
+  type CredentialMode,
+  type EncryptionProfile,
+  type EncryptionDriver,
+  type EncryptionDriverFactory,
+  type EncryptionConfig,
+} from './encryption.js';

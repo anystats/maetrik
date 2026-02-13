@@ -30,6 +30,7 @@ export interface DataSourceManager {
 
   // Registry access
   listTypes(): DataSourceTypeInfo[];
+  getFactory(type: string): ResolvedDataSourceFactory | undefined;
 }
 
 export interface DataSourceManagerOptions {

@@ -124,5 +124,9 @@ export function createDataSourceManager(options: DataSourceManagerOptions): Data
         icon: factory.icon,
       }));
     },
+
+    getFactory(type: string) {
+      return registry.get(type);
+    },
   };
 }

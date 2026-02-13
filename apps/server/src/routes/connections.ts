@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import type { DataSourceManager, StateDatabase } from '@maetrik/core';
+import type { DataSourceManager, StateDatabase, EncryptionManager } from '@maetrik/core';
 import { z } from 'zod';
 
 const createConnectionSchema = z.object({
@@ -22,6 +22,7 @@ const updateConnectionSchema = z.object({
 export interface ConnectionsRouterOptions {
   dataSourceManager: DataSourceManager;
   stateDb?: StateDatabase;
+  encryptionManager?: EncryptionManager;
 }
 
 export function createConnectionsRouter(options: ConnectionsRouterOptions): Router {
@@ -256,7 +257,19 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       return;
     }
 
-    await options.stateDb.createConnection({ id, type, credentials, name, description });
+    // Encrypt sensitive credentials before saving
+    let encryptedCredentials = credentials;
+    if (options.encryptionManager) {
+      const factory = dataSourceManager.getFactory(type);
+      if (factory?.credentialsFields) {
+        encryptedCredentials = await options.encryptionManager.encryptCredentials(
+          credentials,
+          factory.credentialsFields
+        );
+      }
+    }
+
+    await options.stateDb.createConnection({ id, type, credentials: encryptedCredentials, name, description });
 
     res.status(201).json({
       success: true,
@@ -309,8 +322,8 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
     }
 
     // Check if exists in database
-    const exists = await options.stateDb.connectionExists(id);
-    if (!exists) {
+    const existing = await options.stateDb.getConnection(id);
+    if (!existing) {
       res.status(404).json({
         success: false,
         error: {
@@ -321,7 +334,20 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       return;
     }
 
-    await options.stateDb.updateConnection(id, parsed.data);
+    // Encrypt sensitive credentials if provided
+    let updateData = parsed.data;
+    if (parsed.data.credentials && options.encryptionManager) {
+      const factory = dataSourceManager.getFactory(existing.type);
+      if (factory?.credentialsFields) {
+        const encryptedCredentials = await options.encryptionManager.encryptCredentials(
+          parsed.data.credentials,
+          factory.credentialsFields
+        );
+        updateData = { ...parsed.data, credentials: encryptedCredentials };
+      }
+    }
+
+    await options.stateDb.updateConnection(id, updateData);
 
     const updated = await options.stateDb.getConnection(id);
     res.json({

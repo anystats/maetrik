@@ -52,6 +52,16 @@ export const stateStorageConfigSchema = z.object({
   connectionString: z.string().optional(),
 });
 
+export const encryptionProfileSchema = z.object({
+  mode: z.enum(['plaintext', 'encrypted', 'external']),
+  driver: z.string().optional(),
+}).passthrough(); // Allow driver-specific options
+
+export const encryptionConfigSchema = z.object({
+  default: z.string().optional(),
+  profiles: z.record(z.string(), encryptionProfileSchema).default({}),
+}).default({ profiles: {} });
+
 export const maetrikConfigSchema = z.object({
   server: serverConfigSchema.default({ port: 3000, host: 'localhost' }),
   connections: z.record(z.string(), connectionConfigSchema).default({}),
@@ -59,6 +69,7 @@ export const maetrikConfigSchema = z.object({
   llm: llmConfigSchema.default({ driver: 'ollama', model: 'llama3' }),
   auth: authConfigSchema.default({ driver: 'none' }),
   stateStorage: stateStorageConfigSchema.default({ type: 'pglite' }),
+  encryption: encryptionConfigSchema,
 });
 
 // Inferred types from Zod schemas - these are the source of truth
@@ -68,6 +79,8 @@ export type DataSourceConfigEntry = z.infer<typeof dataSourceConfigSchema>;
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 export type AuthConfig = z.infer<typeof authConfigSchema>;
 export type StateStorageConfig = z.infer<typeof stateStorageConfigSchema>;
+export type EncryptionProfileConfig = z.infer<typeof encryptionProfileSchema>;
+export type EncryptionConfigEntry = z.infer<typeof encryptionConfigSchema>;
 export type MaetrikConfig = z.infer<typeof maetrikConfigSchema>;
 export type MaetrikConfigInput = z.input<typeof maetrikConfigSchema>;
 

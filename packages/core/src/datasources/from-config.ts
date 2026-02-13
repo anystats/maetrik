@@ -1,6 +1,7 @@
 import type { DataSourceConfig } from '@maetrik/shared';
 import type { StateDatabase } from '../state/types.js';
 import type { DataSourceManager } from './types.js';
+import type { EncryptionManager } from '../encryption/manager.js';
 import { createDataSourceRegistry } from './registry.js';
 import { createDataSourceManager } from './manager.js';
 import { autodiscoverDataSources } from './autodiscover.js';
@@ -16,13 +17,14 @@ interface Logger {
 export interface CreateDataSourceManagerOptions {
   fileConfigs?: DataSourceConfig[];
   stateDb?: StateDatabase;
+  encryptionManager?: EncryptionManager;
   logger?: Logger;
 }
 
 export async function createDataSourceManagerFromConfig(
   options: CreateDataSourceManagerOptions
 ): Promise<DataSourceManager> {
-  const { fileConfigs = [], stateDb, logger } = options;
+  const { fileConfigs = [], stateDb, encryptionManager, logger } = options;
 
   // Create registry
   const registry = createDataSourceRegistry();
@@ -50,7 +52,11 @@ export async function createDataSourceManagerFromConfig(
   sources.push(new FileConnectionConfigSource(fileConfigs));
 
   if (stateDb) {
-    sources.push(new DatabaseConnectionConfigSource(stateDb));
+    sources.push(new DatabaseConnectionConfigSource({
+      db: stateDb,
+      registry,
+      encryptionManager,
+    }));
   }
 
   // Create resolver

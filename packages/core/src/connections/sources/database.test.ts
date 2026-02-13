@@ -12,7 +12,7 @@ describe('DatabaseConnectionConfigSource', () => {
     await db.initialize();
     // Clean up for test isolation
     await db.execute('DELETE FROM connections');
-    source = new DatabaseConnectionConfigSource(db);
+    source = new DatabaseConnectionConfigSource({ db });
   });
 
   afterEach(async () => {

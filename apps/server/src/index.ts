@@ -1,6 +1,13 @@
 import { createApp, getAppContext } from './app.js';
 import { loadConfig, createLogger } from '@maetrik/shared';
-import { createDataSourceManagerFromConfig, createStateDatabase } from '@maetrik/core';
+import {
+  createDataSourceManagerFromConfig,
+  createStateDatabase,
+  createEncryptionDriverRegistry,
+  createEncryptionManager,
+  plaintextDriverFactory,
+  envKeyDriverFactory,
+} from '@maetrik/core';
 
 const logger = createLogger('server');
 
@@ -28,10 +35,21 @@ async function main() {
     credentials: ds.credentials,
   }));
 
+  // Create encryption manager for credential storage
+  const encryptionRegistry = createEncryptionDriverRegistry();
+  encryptionRegistry.register(plaintextDriverFactory);
+  encryptionRegistry.register(envKeyDriverFactory);
+
+  const encryptionManager = createEncryptionManager({
+    registry: encryptionRegistry,
+    config: config.encryption ?? { profiles: { default: { mode: 'plaintext' } }, default: 'default' },
+  });
+
   // Create manager with both file and database sources
   const dataSourceManager = await createDataSourceManagerFromConfig({
     fileConfigs,
     stateDb,
+    encryptionManager,
     logger,
   });
 
@@ -40,6 +58,7 @@ async function main() {
     llm: config.llm,
     dataSourceManager,
     stateDb,
+    encryptionManager,
   });
 
   const context = getAppContext(app);

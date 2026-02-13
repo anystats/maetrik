@@ -12,6 +12,7 @@ import {
   type SemanticLayer,
   type DataSourceManager,
   type StateDatabase,
+  type EncryptionManager,
 } from '@maetrik/core';
 import { createConnectionsRouter } from './routes/connections.js';
 import { createQueryRouter } from './routes/query.js';
@@ -25,6 +26,7 @@ export interface AppOptions {
   llm?: LLMConfig;
   dataSourceManager: DataSourceManager;
   stateDb?: StateDatabase;
+  encryptionManager?: EncryptionManager;
   corsOrigins?: string[];
 }
 
@@ -95,7 +97,11 @@ export function createApp(options: AppOptions): express.Express {
   // Connections API (uses data source manager and state database)
   app.use(
     '/api/v1/connections',
-    createConnectionsRouter({ dataSourceManager, stateDb: options.stateDb })
+    createConnectionsRouter({
+      dataSourceManager,
+      stateDb: options.stateDb,
+      encryptionManager: options.encryptionManager,
+    })
   );
 
   // Query API (raw SQL)
