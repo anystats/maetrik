@@ -113,6 +113,8 @@ export interface CredentialsFieldDefinition {
   type?: 'text' | 'password' | 'number' | 'boolean';  // Defaults to 'text'
   placeholder?: string;
   helpText?: string;
+  /** Mark field as sensitive - will be encrypted in storage */
+  sensitive?: boolean;
 }
 
 export type CredentialsFieldDefinitions = Record<string, CredentialsFieldDefinition>;

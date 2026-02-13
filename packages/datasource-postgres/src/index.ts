@@ -49,6 +49,23 @@ const postgresCredentialsSchema: JSONSchema7 = {
       default: false,
       description: 'Enable SSL connection',
     },
+    rejectUnauthorized: {
+      type: 'boolean',
+      default: true,
+      description: 'Verify server certificate (set to false for self-signed certs)',
+    },
+    ca: {
+      type: 'string',
+      description: 'Custom CA certificate (PEM format)',
+    },
+    cert: {
+      type: 'string',
+      description: 'Client certificate for mutual TLS (PEM format)',
+    },
+    key: {
+      type: 'string',
+      description: 'Client private key for mutual TLS (PEM format)',
+    },
   },
 };
 
@@ -59,6 +76,10 @@ interface PostgresCredentials {
   user?: string;
   password?: string;
   ssl?: boolean;
+  rejectUnauthorized?: boolean;
+  ca?: string;
+  cert?: string;
+  key?: string;
 }
 
 export class PostgresDataSource
@@ -100,7 +121,14 @@ export class PostgresDataSource
       database: creds.database,
       user: creds.user,
       password: creds.password,
-      ssl: creds.ssl ? { rejectUnauthorized: false } : undefined,
+      ssl: creds.ssl
+        ? {
+            rejectUnauthorized: creds.rejectUnauthorized ?? true,
+            ca: creds.ca,
+            cert: creds.cert,
+            key: creds.key,
+          }
+        : undefined,
     });
 
     try {
@@ -355,8 +383,12 @@ export const dataSourceFactory: DataSourceFactory = {
     port: { type: 'number', placeholder: '5432' },
     database: {},
     user: {},
-    password: { type: 'password' },
+    password: { type: 'password', sensitive: true },
     ssl: { type: 'boolean', label: 'Use SSL' },
+    rejectUnauthorized: { type: 'boolean', label: 'Verify Certificate' },
+    ca: { label: 'CA Certificate', sensitive: true },
+    cert: { label: 'Client Certificate', sensitive: true },
+    key: { label: 'Client Key', sensitive: true },
   },
   create: () => new PostgresDataSource(),
 };
