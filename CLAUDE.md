@@ -8,6 +8,8 @@ Maetrik is a natural language data retrieval framework. Users ask questions in p
 
 **SQL-targeted, query-language agnostic:** The primary focus is SQL databases (PostgreSQL, MySQL, SQLite, etc.), but the architecture is designed to support other query languages (MongoDB's MQL, Neo4j's Cypher, GraphQL, etc.) without breaking changes. SQL is the default and optimized path; other query languages are considered "exotic" extensions.
 
+Dont forget update docs in project when something significant was updated.
+
 ## Commands
 
 ```bash

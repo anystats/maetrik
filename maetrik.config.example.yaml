@@ -28,12 +28,13 @@ llm:
   # model: gpt-4o
   # apiKey: ${OPENAI_API_KEY}
 
-# Authentication
-auth:
-  driver: none
-  # Or for password auth:
-  # driver: password
-  # sessionSecret: ${SESSION_SECRET}
+# Encryption for database-stored credentials
+# Plaintext mode stores credentials as-is (suitable for local development)
+encryption:
+  default: local
+  profiles:
+    local:
+      mode: plaintext
 
 # State storage for internal server data
 # Supported: pglite (embedded) and postgres (external)

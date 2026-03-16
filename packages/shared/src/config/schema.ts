@@ -27,11 +27,6 @@ export const llmConfigSchema = z.object({
   apiKey: z.string().optional(),
 });
 
-export const authConfigSchema = z.object({
-  driver: z.string().default('none'),
-  sessionSecret: z.string().optional(),
-});
-
 export const connectionOptionsSchema = z.object({
   timeoutMs: z.number().positive().default(30000),
   idleTimeoutMs: z.number().positive().default(60000),
@@ -67,7 +62,6 @@ export const maetrikConfigSchema = z.object({
   connections: z.record(z.string(), connectionConfigSchema).default({}),
   dataSources: z.array(dataSourceConfigSchema).default([]),
   llm: llmConfigSchema.default({ driver: 'ollama', model: 'llama3' }),
-  auth: authConfigSchema.default({ driver: 'none' }),
   stateStorage: stateStorageConfigSchema.default({ type: 'pglite' }),
   encryption: encryptionConfigSchema,
 });
@@ -77,7 +71,6 @@ export type ServerConfig = z.infer<typeof serverConfigSchema>;
 export type ConnectionConfig = z.infer<typeof connectionConfigSchema>;
 export type DataSourceConfigEntry = z.infer<typeof dataSourceConfigSchema>;
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
-export type AuthConfig = z.infer<typeof authConfigSchema>;
 export type StateStorageConfig = z.infer<typeof stateStorageConfigSchema>;
 export type EncryptionProfileConfig = z.infer<typeof encryptionProfileSchema>;
 export type EncryptionConfigEntry = z.infer<typeof encryptionConfigSchema>;
