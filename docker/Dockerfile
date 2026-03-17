@@ -25,7 +25,7 @@ COPY --from=deps /app/packages/datasource-postgres/node_modules ./packages/datas
 COPY --from=deps /app/apps/server/node_modules ./apps/server/node_modules
 COPY . .
 
-RUN pnpm build
+RUN pnpm --filter @maetrik/server... build
 
 # Production stage
 FROM base AS runner

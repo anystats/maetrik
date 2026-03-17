@@ -3,7 +3,6 @@ export type {
   ServerConfig,
   ConnectionConfig,
   LLMConfig,
-  AuthConfig,
   StateStorageConfig,
   MaetrikConfig,
   MaetrikConfigInput,
