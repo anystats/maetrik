@@ -66,24 +66,6 @@ const postgresCredentialsSchema: JSONSchema7 = {
       type: 'string',
       description: 'Client private key for mutual TLS (PEM format)',
     },
-    maxConnections: {
-      type: 'integer',
-      default: 10,
-      minimum: 1,
-      description: 'Maximum number of connections in the pool',
-    },
-    idleTimeoutMs: {
-      type: 'integer',
-      default: 30000,
-      minimum: 0,
-      description: 'Close idle connections after this many milliseconds (0 to disable)',
-    },
-    connectionTimeoutMs: {
-      type: 'integer',
-      default: 5000,
-      minimum: 0,
-      description: 'Maximum time to wait for a connection from the pool (ms)',
-    },
   },
 };
 
@@ -98,9 +80,6 @@ interface PostgresCredentials {
   ca?: string;
   cert?: string;
   key?: string;
-  maxConnections?: number;
-  idleTimeoutMs?: number;
-  connectionTimeoutMs?: number;
 }
 
 export class PostgresDataSource
@@ -150,9 +129,9 @@ export class PostgresDataSource
             key: creds.key,
           }
         : undefined,
-      max: creds.maxConnections ?? 10,
-      idleTimeoutMillis: creds.idleTimeoutMs ?? 30000,
-      connectionTimeoutMillis: creds.connectionTimeoutMs ?? 5000,
+      max: config.connection?.maxConnections ?? 10,
+      idleTimeoutMillis: config.connection?.idleTimeoutMs ?? 30000,
+      connectionTimeoutMillis: config.connection?.timeoutMs ?? 5000,
     });
 
     // Verify connectivity by acquiring and releasing a connection
@@ -208,6 +187,7 @@ export class PostgresDataSource
         SELECT table_schema, table_name
         FROM information_schema.tables
         WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+          AND table_type = 'BASE TABLE'
         ORDER BY table_schema, table_name
       `);
 
@@ -424,9 +404,6 @@ export const dataSourceFactory: DataSourceFactory = {
     ca: { label: 'CA Certificate', sensitive: true },
     cert: { label: 'Client Certificate', sensitive: true },
     key: { label: 'Client Key', sensitive: true },
-    maxConnections: { type: 'number', label: 'Max Connections', placeholder: '10' },
-    idleTimeoutMs: { type: 'number', label: 'Idle Timeout (ms)', placeholder: '30000' },
-    connectionTimeoutMs: { type: 'number', label: 'Connection Timeout (ms)', placeholder: '5000' },
   },
   create: () => new PostgresDataSource(),
 };

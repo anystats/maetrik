@@ -73,6 +73,8 @@ export interface ConnectionOptions {
   timeoutMs?: number;
   /** Close idle connections after this many milliseconds (default: 60000) */
   idleTimeoutMs?: number;
+  /** Maximum number of connections in the pool (default: 10) */
+  maxConnections?: number;
   /** Number of times to retry failed connections (default: 0) */
   maxRetries?: number;
   /** Delay between retries in milliseconds (default: 1000) */
