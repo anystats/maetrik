@@ -24,6 +24,7 @@ import {
   type Connection,
   type CreateConnectionInput,
   type ConnectionOptions,
+  type ConnectionDetailsOptions,
   type DataSourceType,
   type OptionsFieldDefinition,
   ApiError,
@@ -32,30 +33,21 @@ import { Loader2, CheckCircle, XCircle, Zap } from "lucide-react";
 
 interface ConnectionFormProps {
   mode: "create" | "edit";
-  initialData?: Connection & { credentials?: Record<string, unknown>; connection?: ConnectionOptions };
+  initialData?: Connection & { options?: ConnectionDetailsOptions };
 }
 
 const CONNECTION_OPTIONS_FIELDS: Record<string, OptionsFieldDefinition> = {
   maxConnections: {
-    label: "Max Connections",
+    label: "Max Concurrent Connections",
     type: "number",
     placeholder: "10",
     default: 10,
-    helpText: "Maximum number of connections in the pool",
   },
   timeoutMs: {
-    label: "Connect Timeout (ms)",
+    label: "Response Waiting Timeout (ms)",
     type: "number",
     placeholder: "30000",
     default: 30000,
-    helpText: "Connection timeout in milliseconds",
-  },
-  idleTimeoutMs: {
-    label: "Idle Timeout (ms)",
-    type: "number",
-    placeholder: "60000",
-    default: 60000,
-    helpText: "Close idle connections after this many milliseconds",
   },
   maxRetries: {
     label: "Max Retries",
@@ -93,14 +85,13 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
   const [loadingTypes, setLoadingTypes] = useState(true);
   const [selectedType, setSelectedType] = useState<string>(initialData?.type || "");
 
-  const [formData, setFormData] = useState<Record<string, unknown>>({
-    name: initialData?.name || "",
-    description: initialData?.description || "",
-    ...initialData?.credentials,
-  });
-
-  const [connectionOptions, setConnectionOptions] = useState<Record<string, unknown>>(
-    (initialData?.connection as Record<string, unknown>) || {}
+  const [name, setName] = useState(initialData?.name || "");
+  const [description, setDescription] = useState(initialData?.description || "");
+  const [credentials, setCredentials] = useState<Record<string, unknown>>(
+    initialData?.options?.credentials || {}
+  );
+  const [connection, setConnection] = useState<Record<string, unknown>>(
+    (initialData?.options?.connection as Record<string, unknown>) || {}
   );
 
   const [saving, setSaving] = useState(false);
@@ -138,19 +129,19 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
 
     const defaults: Record<string, unknown> = {};
     for (const [key, field] of Object.entries(currentType.optionsFields)) {
-      if (field.default !== undefined && formData[key] === undefined) {
+      if (field.default !== undefined && credentials[key] === undefined) {
         defaults[key] = field.default;
       }
     }
     if (Object.keys(defaults).length > 0) {
-      setFormData((prev) => ({ ...defaults, ...prev }));
+      setCredentials((prev) => ({ ...defaults, ...prev }));
     }
   }, [selectedType, currentType]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!(formData.name as string)?.trim()) {
+    if (!name.trim()) {
       newErrors.name = "Name is required";
     }
 
@@ -160,7 +151,7 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
 
     for (const [key, field] of Object.entries(optionsFields)) {
       if (field.required) {
-        const value = formData[key];
+        const value = credentials[key];
         if (value === undefined || value === null || value === "") {
           newErrors[key] = `${field.label || prettifyFieldName(key)} is required`;
         }
@@ -171,8 +162,18 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleFieldChange = (key: string, value: unknown) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
+  const handleCredentialChange = (key: string, value: unknown) => {
+    setCredentials((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleConnectionChange = (key: string, value: unknown) => {
+    setConnection((prev) => {
+      if (value === undefined || value === "") {
+        const { [key]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [key]: value };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -183,21 +184,17 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
 
     const connectionId = mode === "create" ? generateId() : initialData?.id || "";
 
-    // Separate metadata from credentials
-    const { name, description, ...credentials } = formData;
-
-    // Only include connection options that differ from defaults
-    const connection = Object.keys(connectionOptions).length > 0
-      ? connectionOptions as ConnectionOptions
-      : undefined;
-
     const input: CreateConnectionInput = {
       id: connectionId,
       type: selectedType,
-      credentials,
-      connection,
-      name: (name as string) || undefined,
-      description: (description as string) || undefined,
+      options: {
+        credentials,
+        connection: Object.keys(connection).length > 0
+          ? connection as ConnectionOptions
+          : undefined,
+      },
+      name: name || undefined,
+      description: description || undefined,
     };
 
     try {
@@ -210,8 +207,7 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
         });
       } else {
         await updateConnection(initialData!.id, {
-          credentials: input.credentials,
-          connection: input.connection,
+          options: input.options,
           name: input.name,
           description: input.description,
         });
@@ -268,9 +264,13 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
     }
   };
 
-  const renderField = (key: string, field: OptionsFieldDefinition) => {
+  const renderField = (
+    key: string,
+    field: OptionsFieldDefinition,
+    value: unknown,
+    onChange: (key: string, value: unknown) => void
+  ) => {
     const label = field.label || prettifyFieldName(key);
-    const value = formData[key];
 
     if (field.type === "boolean") {
       return (
@@ -279,7 +279,7 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
           <Switch
             id={key}
             checked={!!value}
-            onCheckedChange={(checked) => handleFieldChange(key, checked)}
+            onCheckedChange={(checked) => onChange(key, checked)}
           />
         </div>
       );
@@ -298,7 +298,7 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
           value={value !== undefined && value !== null ? String(value) : ""}
           onChange={(e) => {
             const raw = e.target.value;
-            handleFieldChange(key, field.type === "number" ? (raw === "" ? undefined : parseInt(raw, 10)) : raw);
+            onChange(key, field.type === "number" ? (raw === "" ? undefined : parseInt(raw, 10)) : raw);
           }}
           className={errors[key] ? "border-red-500" : ""}
         />
@@ -310,7 +310,7 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Basic Info */}
         <Card>
           <CardHeader>
@@ -325,8 +325,8 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
               <Input
                 id="name"
                 placeholder="Production Database"
-                value={(formData.name as string) || ""}
-                onChange={(e) => handleFieldChange("name", e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className={errors.name ? "border-red-500" : ""}
               />
               {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
@@ -367,8 +367,8 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
               <Input
                 id="description"
                 placeholder="Main production database for user data"
-                value={(formData.description as string) || ""}
-                onChange={(e) => handleFieldChange("description", e.target.value)}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
               />
             </div>
           </CardContent>
@@ -387,9 +387,13 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
           <CardContent className="space-y-4">
             {Object.keys(optionsFields).length > 0 ? (
               <>
-                {Object.entries(optionsFields).map(([key, field]) =>
-                  renderField(key, field)
-                )}
+                {Object.entries(optionsFields)
+                  .filter(([, field]) =>
+                    !field.visibleWhen || field.visibleWhen.every((dep) => !!credentials[dep])
+                  )
+                  .map(([key, field]) =>
+                    renderField(key, field, credentials[key], handleCredentialChange)
+                  )}
               </>
             ) : (
               !loadingTypes && (
@@ -398,40 +402,6 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
                 </p>
               )
             )}
-
-            {/* Connection pool & timing options */}
-            <div className="border-t pt-4 mt-4">
-              <p className="text-sm font-medium mb-3">Connection Pool</p>
-              <div className="space-y-4">
-                {Object.entries(CONNECTION_OPTIONS_FIELDS).map(([key, field]) => {
-                  const value = connectionOptions[key];
-                  return (
-                    <div key={key} className="space-y-2">
-                      <Label htmlFor={`conn-${key}`}>{field.label}</Label>
-                      <Input
-                        id={`conn-${key}`}
-                        type="number"
-                        placeholder={field.placeholder}
-                        value={value !== undefined && value !== null ? String(value) : ""}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          setConnectionOptions((prev) => {
-                            if (raw === "") {
-                              const { [key]: _, ...rest } = prev;
-                              return rest;
-                            }
-                            return { ...prev, [key]: parseInt(raw, 10) };
-                          });
-                        }}
-                      />
-                      {field.helpText && (
-                        <p className="text-xs text-muted-foreground">{field.helpText}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
 
             {mode === "edit" && (
               <div className="pt-2">
@@ -454,6 +424,19 @@ export function ConnectionForm({ mode, initialData }: ConnectionFormProps) {
                   Test Connection
                 </Button>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Connection Pool */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Connection Policy</CardTitle>
+            <CardDescription>Pool and retry settings</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Object.entries(CONNECTION_OPTIONS_FIELDS).map(([key, field]) =>
+              renderField(key, field, connection[key], handleConnectionChange)
             )}
           </CardContent>
         </Card>

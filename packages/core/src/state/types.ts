@@ -1,11 +1,13 @@
 export interface ConnectionRow {
   id: string;
   type: string;
-  credentials: Record<string, unknown>;
+  options: {
+    credentials: Record<string, unknown>;
+    connection?: Record<string, unknown>;
+  };
   name?: string;
   description?: string;
   enabled: boolean;
-  meta: Record<string, unknown>;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -13,15 +15,19 @@ export interface ConnectionRow {
 export interface CreateConnectionInput {
   id: string;
   type: string;
-  credentials: Record<string, unknown>;
-  connection?: Record<string, unknown>;
+  options: {
+    credentials: Record<string, unknown>;
+    connection?: Record<string, unknown>;
+  };
   name?: string;
   description?: string;
 }
 
 export interface UpdateConnectionInput {
-  credentials?: Record<string, unknown>;
-  connection?: Record<string, unknown>;
+  options?: {
+    credentials?: Record<string, unknown>;
+    connection?: Record<string, unknown>;
+  };
   name?: string;
   description?: string;
   enabled?: boolean;

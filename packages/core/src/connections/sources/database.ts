@@ -44,9 +44,9 @@ export class DatabaseConnectionConfigSource implements ConnectionConfigSource {
     const row = await this.db.getConnection(id);
     if (!row) return undefined;
 
-    const credentials = await this.decryptCredentials(row.type, row.credentials);
+    const credentials = await this.decryptCredentials(row.type, row.options.credentials);
 
-    const connection = (row.meta as Record<string, unknown>)?.connection as Record<string, unknown> | undefined;
+    const connection = row.options.connection;
     return {
       id: row.id,
       type: row.type,
@@ -60,8 +60,8 @@ export class DatabaseConnectionConfigSource implements ConnectionConfigSource {
 
     return Promise.all(
       rows.map(async (row) => {
-        const credentials = await this.decryptCredentials(row.type, row.credentials);
-        const connection = (row.meta as Record<string, unknown>)?.connection as Record<string, unknown> | undefined;
+        const credentials = await this.decryptCredentials(row.type, row.options.credentials);
+        const connection = row.options.connection;
         return {
           id: row.id,
           type: row.type,

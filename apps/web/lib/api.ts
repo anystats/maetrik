@@ -11,10 +11,6 @@ export interface Connection {
   enabled: boolean;
 }
 
-export interface ConnectionDetails extends Connection {
-  credentials?: Record<string, unknown>;
-}
-
 export interface ConnectionOptions {
   timeoutMs?: number;
   idleTimeoutMs?: number;
@@ -23,18 +19,25 @@ export interface ConnectionOptions {
   retryDelayMs?: number;
 }
 
+export interface ConnectionDetailsOptions {
+  credentials: Record<string, unknown>;
+  connection?: ConnectionOptions;
+}
+
+export interface ConnectionDetails extends Connection {
+  options?: ConnectionDetailsOptions;
+}
+
 export interface CreateConnectionInput {
   id: string;
   type: string;
-  credentials: Record<string, unknown>;
-  connection?: ConnectionOptions;
+  options: ConnectionDetailsOptions;
   name?: string;
   description?: string;
 }
 
 export interface UpdateConnectionInput {
-  credentials?: Record<string, unknown>;
-  connection?: ConnectionOptions;
+  options?: Partial<ConnectionDetailsOptions>;
   name?: string;
   description?: string;
   enabled?: boolean;
@@ -132,6 +135,7 @@ export interface OptionsFieldDefinition {
   sensitive?: boolean;
   required?: boolean;
   default?: unknown;
+  visibleWhen?: string[];
 }
 
 export interface DataSourceType {

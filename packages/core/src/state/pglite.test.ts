@@ -54,7 +54,7 @@ describe('PGLiteStateDatabase', () => {
       await db.createConnection({
         id: 'test-conn',
         type: 'postgres',
-        credentials: { host: 'localhost', port: 5432 },
+        options: { credentials: { host: 'localhost', port: 5432 } },
         name: 'Test Connection',
       });
 
@@ -62,7 +62,7 @@ describe('PGLiteStateDatabase', () => {
       expect(conn).toBeDefined();
       expect(conn!.id).toBe('test-conn');
       expect(conn!.type).toBe('postgres');
-      expect(conn!.credentials).toEqual({ host: 'localhost', port: 5432 });
+      expect(conn!.options).toEqual({ credentials: { host: 'localhost', port: 5432 } });
       expect(conn!.name).toBe('Test Connection');
     });
 
@@ -75,12 +75,12 @@ describe('PGLiteStateDatabase', () => {
       await db.createConnection({
         id: 'conn-1',
         type: 'postgres',
-        credentials: { host: 'host1' },
+        options: { credentials: { host: 'host1' } },
       });
       await db.createConnection({
         id: 'conn-2',
         type: 'mysql',
-        credentials: { host: 'host2' },
+        options: { credentials: { host: 'host2' } },
       });
 
       const connections = await db.listConnections();
@@ -91,7 +91,7 @@ describe('PGLiteStateDatabase', () => {
       await db.createConnection({
         id: 'exists-test',
         type: 'postgres',
-        credentials: {},
+        options: { credentials: {} },
       });
 
       expect(await db.connectionExists('exists-test')).toBe(true);
@@ -102,7 +102,7 @@ describe('PGLiteStateDatabase', () => {
       await db.createConnection({
         id: 'to-delete',
         type: 'postgres',
-        credentials: {},
+        options: { credentials: {} },
       });
 
       await db.deleteConnection('to-delete');
@@ -113,17 +113,17 @@ describe('PGLiteStateDatabase', () => {
       await db.createConnection({
         id: 'to-update',
         type: 'postgres',
-        credentials: { host: 'old' },
+        options: { credentials: { host: 'old' } },
         name: 'Old Name',
       });
 
       await db.updateConnection('to-update', {
-        credentials: { host: 'new' },
+        options: { credentials: { host: 'new' } },
         name: 'New Name',
       });
 
       const conn = await db.getConnection('to-update');
-      expect(conn!.credentials).toEqual({ host: 'new' });
+      expect(conn!.options).toEqual({ credentials: { host: 'new' } });
       expect(conn!.name).toBe('New Name');
     });
   });

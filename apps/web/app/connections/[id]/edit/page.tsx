@@ -40,7 +40,7 @@ export default function EditConnectionPage() {
           <Skeleton className="mb-1 h-8 w-48" />
           <Skeleton className="h-4 w-64" />
         </div>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-3">
           <Skeleton className="h-96" />
           <Skeleton className="h-96" />
         </div>

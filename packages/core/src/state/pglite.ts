@@ -22,11 +22,10 @@ export class PGLiteStateDatabase implements StateDatabase {
       CREATE TABLE IF NOT EXISTS connections (
         id TEXT PRIMARY KEY,
         type TEXT NOT NULL,
-        credentials JSONB NOT NULL,
+        options JSONB NOT NULL,
         name TEXT,
         description TEXT,
         enabled BOOLEAN NOT NULL DEFAULT false,
-        meta JSONB NOT NULL DEFAULT '{}',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -59,16 +58,15 @@ export class PGLiteStateDatabase implements StateDatabase {
   async createConnection(input: CreateConnectionInput): Promise<void> {
     if (!this.db) throw new Error('State database not initialized');
     await this.db.query(
-      `INSERT INTO connections (id, type, credentials, name, description, enabled, meta)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO connections (id, type, options, name, description, enabled)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         input.id,
         input.type,
-        JSON.stringify(input.credentials),
+        JSON.stringify(input.options),
         input.name ?? null,
         input.description ?? null,
         false,  // Connections always start disabled
-        JSON.stringify(input.connection ? { connection: input.connection } : {}),
       ]
     );
   }
@@ -76,7 +74,7 @@ export class PGLiteStateDatabase implements StateDatabase {
   async getConnection(id: string): Promise<ConnectionRow | undefined> {
     if (!this.db) throw new Error('State database not initialized');
     const result = await this.db.query<ConnectionRow>(
-      'SELECT id, type, credentials, name, description, enabled, meta, created_at, updated_at FROM connections WHERE id = $1',
+      'SELECT id, type, options, name, description, enabled, created_at, updated_at FROM connections WHERE id = $1',
       [id]
     );
     return result.rows[0];
@@ -85,7 +83,7 @@ export class PGLiteStateDatabase implements StateDatabase {
   async listConnections(): Promise<ConnectionRow[]> {
     if (!this.db) throw new Error('State database not initialized');
     const result = await this.db.query<ConnectionRow>(
-      'SELECT id, type, credentials, name, description, enabled, meta, created_at, updated_at FROM connections ORDER BY created_at'
+      'SELECT id, type, options, name, description, enabled, created_at, updated_at FROM connections ORDER BY created_at'
     );
     return result.rows;
   }
@@ -105,9 +103,9 @@ export class PGLiteStateDatabase implements StateDatabase {
     const params: unknown[] = [];
     let paramIndex = 1;
 
-    if (input.credentials !== undefined) {
-      sets.push(`credentials = $${paramIndex++}`);
-      params.push(JSON.stringify(input.credentials));
+    if (input.options !== undefined) {
+      sets.push(`options = $${paramIndex++}`);
+      params.push(JSON.stringify(input.options));
     }
     if (input.name !== undefined) {
       sets.push(`name = $${paramIndex++}`);
@@ -120,10 +118,6 @@ export class PGLiteStateDatabase implements StateDatabase {
     if (input.enabled !== undefined) {
       sets.push(`enabled = $${paramIndex++}`);
       params.push(input.enabled);
-    }
-    if (input.connection !== undefined) {
-      sets.push(`meta = jsonb_set(COALESCE(meta, '{}'), '{connection}', $${paramIndex++}::jsonb)`);
-      params.push(JSON.stringify(input.connection));
     }
 
     params.push(id);

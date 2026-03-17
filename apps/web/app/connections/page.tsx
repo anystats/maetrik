@@ -103,15 +103,8 @@ export default function ConnectionsPage() {
     }
   };
 
-  const getTypeBadgeVariant = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "postgres":
-        return "default";
-      case "mysql":
-        return "secondary";
-      default:
-        return "outline";
-    }
+  const getTypeBadgeVariant = (_type: string) => {
+    return "secondary" as const;
   };
 
   const openDeleteDialog = (connection: Connection) => {

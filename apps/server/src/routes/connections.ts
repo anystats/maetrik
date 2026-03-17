@@ -8,20 +8,23 @@ const connectionOptionsSchema = z.object({
   maxConnections: z.number().int().positive().optional(),
   maxRetries: z.number().int().min(0).optional(),
   retryDelayMs: z.number().int().positive().optional(),
-}).optional();
+});
+
+const optionsSchema = z.object({
+  credentials: z.record(z.string(), z.unknown()),
+  connection: connectionOptionsSchema.optional(),
+});
 
 const createConnectionSchema = z.object({
   id: z.string().min(1).max(100).regex(/^[a-z0-9-_]+$/i, 'ID must be alphanumeric with dashes/underscores'),
   type: z.string().min(1),
-  credentials: z.record(z.string(), z.unknown()),
-  connection: connectionOptionsSchema,
+  options: optionsSchema,
   name: z.string().optional(),
   description: z.string().optional(),
 });
 
 const updateConnectionSchema = z.object({
-  credentials: z.record(z.string(), z.unknown()).optional(),
-  connection: connectionOptionsSchema,
+  options: optionsSchema.partial().optional(),
   name: z.string().optional(),
   description: z.string().optional(),
   enabled: z.boolean().optional(),
@@ -88,7 +91,10 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
           description: dbConnection?.description,
           // File-config connections are always enabled, DB connections have explicit enabled flag
           enabled: dbConnection?.enabled ?? true,
-          credentials: config.credentials,
+          options: {
+            credentials: config.credentials,
+            connection: config.connection,
+          },
         },
       });
     } catch {
@@ -239,7 +245,7 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       return;
     }
 
-    const { id, type, credentials, connection, name, description } = parsed.data;
+    const { id, type, options: reqOptions, name, description } = parsed.data;
 
     // Check if ID exists in file config (can't override)
     const canAdd = await dataSourceManager.canAddToDatabase(id);
@@ -268,18 +274,21 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
     }
 
     // Encrypt sensitive credentials before saving
-    let encryptedCredentials = credentials;
+    let processedOptions = { ...reqOptions };
     if (options.encryptionManager) {
       const factory = dataSourceManager.getFactory(type);
       if (factory?.credentialsFields) {
-        encryptedCredentials = await options.encryptionManager.encryptCredentials(
-          credentials,
-          factory.credentialsFields
-        );
+        processedOptions = {
+          ...processedOptions,
+          credentials: await options.encryptionManager.encryptCredentials(
+            reqOptions.credentials,
+            factory.credentialsFields
+          ),
+        };
       }
     }
 
-    await options.stateDb.createConnection({ id, type, credentials: encryptedCredentials, connection, name, description });
+    await options.stateDb.createConnection({ id, type, options: processedOptions, name, description });
 
     res.status(201).json({
       success: true,
@@ -345,16 +354,23 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
     }
 
     // Encrypt sensitive credentials if provided
-    let updateData: Record<string, unknown> = { ...parsed.data };
-    if (parsed.data.credentials && options.encryptionManager) {
-      const factory = dataSourceManager.getFactory(existing.type);
-      if (factory?.credentialsFields) {
-        const encryptedCredentials = await options.encryptionManager.encryptCredentials(
-          parsed.data.credentials,
-          factory.credentialsFields
-        );
-        updateData = { ...parsed.data, credentials: encryptedCredentials };
+    const { options: reqOptions, ...restData } = parsed.data;
+    let updateData: Record<string, unknown> = { ...restData };
+    if (reqOptions) {
+      let processedOptions = { ...reqOptions };
+      if (reqOptions.credentials && options.encryptionManager) {
+        const factory = dataSourceManager.getFactory(existing.type);
+        if (factory?.credentialsFields) {
+          processedOptions = {
+            ...processedOptions,
+            credentials: await options.encryptionManager.encryptCredentials(
+              reqOptions.credentials,
+              factory.credentialsFields
+            ),
+          };
+        }
       }
+      updateData.options = processedOptions;
     }
 
     await options.stateDb.updateConnection(id, updateData);

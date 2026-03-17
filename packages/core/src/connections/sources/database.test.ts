@@ -24,7 +24,7 @@ describe('DatabaseConnectionConfigSource', () => {
       await db.createConnection({
         id: 'test-db',
         type: 'postgres',
-        credentials: { host: 'localhost' },
+        options: { credentials: { host: 'localhost' } },
         name: 'Test DB',
       });
 
@@ -47,12 +47,12 @@ describe('DatabaseConnectionConfigSource', () => {
       await db.createConnection({
         id: 'conn-1',
         type: 'postgres',
-        credentials: { host: 'host1' },
+        options: { credentials: { host: 'host1' } },
       });
       await db.createConnection({
         id: 'conn-2',
         type: 'mysql',
-        credentials: { host: 'host2' },
+        options: { credentials: { host: 'host2' } },
       });
 
       const configs = await source.list();
@@ -75,7 +75,7 @@ describe('DatabaseConnectionConfigSource', () => {
       await db.createConnection({
         id: 'exists',
         type: 'postgres',
-        credentials: {},
+        options: { credentials: {} },
       });
 
       expect(await source.has('exists')).toBe(true);

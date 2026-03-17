@@ -117,6 +117,8 @@ export interface CredentialsFieldDefinition {
   helpText?: string;
   /** Mark field as sensitive - will be encrypted in storage */
   sensitive?: boolean;
+  /** Only show this field when all listed fields are truthy */
+  visibleWhen?: string[];
 }
 
 export type CredentialsFieldDefinitions = Record<string, CredentialsFieldDefinition>;

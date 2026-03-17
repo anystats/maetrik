@@ -181,7 +181,7 @@ describe('Connections API', () => {
         .send({
           id: 'new-db',
           type: 'postgres',
-          credentials: { host: 'localhost', port: 5432 },
+          options: { credentials: { host: 'localhost', port: 5432 } },
           name: 'New Database',
         });
 
@@ -218,7 +218,7 @@ describe('Connections API', () => {
         .send({
           id: 'main',
           type: 'postgres',
-          credentials: {},
+          options: { credentials: {} },
         });
 
       expect(response.status).toBe(409);
@@ -231,7 +231,7 @@ describe('Connections API', () => {
         .send({
           id: 'new-db',
           type: 'postgres',
-          credentials: {},
+          options: { credentials: {} },
         });
 
       expect(response.status).toBe(501);
