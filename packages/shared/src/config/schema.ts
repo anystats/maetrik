@@ -55,7 +55,7 @@ export const encryptionProfileSchema = z.object({
 export const encryptionConfigSchema = z.object({
   default: z.string().optional(),
   profiles: z.record(z.string(), encryptionProfileSchema).default({}),
-}).default({ profiles: {} });
+}).default({ default: 'default', profiles: { default: { mode: 'plaintext' } } });
 
 export const maetrikConfigSchema = z.object({
   server: serverConfigSchema.default({ port: 3000, host: 'localhost' }),

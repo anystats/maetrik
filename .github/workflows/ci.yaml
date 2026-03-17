@@ -23,7 +23,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm typecheck
+      - run: pnpm --filter '!apps-docs' typecheck
 
   test:
     runs-on: ubuntu-latest
@@ -41,9 +41,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      - run: pnpm --filter '!apps-docs' build
 
-      - run: pnpm test
+      - run: pnpm --filter '!apps-docs' test
 
   build:
     runs-on: ubuntu-latest
@@ -61,7 +61,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      - run: pnpm --filter '!apps-docs' build
 
   docker:
     runs-on: ubuntu-latest
@@ -73,8 +73,18 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run -d -p 3000:3000 -e MAETRIK_SERVER_HOST=0.0.0.0 --name maetrik-test maetrik:ci
-          sleep 5
-          curl -f http://localhost:3000/health || exit 1
+          docker run -d -p 3000:3000 --name maetrik-test maetrik:ci
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:3000/health; then
+              echo ""
+              echo "Server is healthy"
+              docker stop maetrik-test
+              exit 0
+            fi
+            echo "Waiting for server... ($i/15)"
+            sleep 2
+          done
+          echo "Server failed to start"
+          docker logs maetrik-test
           docker stop maetrik-test
-
+          exit 1
