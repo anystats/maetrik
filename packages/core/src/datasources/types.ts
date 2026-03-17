@@ -1,4 +1,4 @@
-import type { DataSourceFactory, ResolvedDataSourceFactory, DataSourceDriver, DataSourceConfig } from '@maetrik/shared';
+import type { DataSourceFactory, ResolvedDataSourceFactory, DataSourceDriver, DataSourceConfig, OptionsFieldDefinitions } from '@maetrik/shared';
 import type { ConnectionConfigResolver } from '../connections/types.js';
 
 export interface DataSourceRegistry {
@@ -13,6 +13,7 @@ export interface DataSourceTypeInfo {
   displayName: string;
   description?: string;
   icon?: string;  // Base64 data URI
+  optionsFields?: OptionsFieldDefinitions;
 }
 
 export interface DataSourceManager {

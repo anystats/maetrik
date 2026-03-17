@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@maetrik/core": "workspace:^",
+    "@maetrik/datasource-mysql": "workspace:*",
     "@maetrik/datasource-postgres": "workspace:*",
     "@maetrik/shared": "workspace:*",
     "cors": "^2.8.5",

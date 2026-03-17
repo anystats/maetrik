@@ -1,6 +1,6 @@
 import type { JSONSchema7 } from 'json-schema';
 import type { DataSourceFactory } from '@maetrik/shared';
-import { PostgresDataSource } from './driver.js';
+import { MysqlDataSource } from './driver.js';
 
 const credentialsSchema: JSONSchema7 = {
   type: 'object',
@@ -12,7 +12,7 @@ const credentialsSchema: JSONSchema7 = {
     },
     port: {
       type: 'integer',
-      default: 5432,
+      default: 3306,
       description: 'Database port',
     },
     database: {
@@ -53,14 +53,14 @@ const credentialsSchema: JSONSchema7 = {
 };
 
 export const dataSourceFactory: DataSourceFactory = {
-  type: 'postgres',
-  displayName: 'PostgreSQL',
-  description: 'Connect to PostgreSQL databases',
-  iconPath: './assets/postgres.png',
+  type: 'mysql',
+  displayName: 'MySQL',
+  description: 'Connect to MySQL databases',
+  iconPath: './assets/mysql.png',
   credentialsSchema,
   credentialsFields: {
     host: { placeholder: 'localhost' },
-    port: { type: 'number', placeholder: '5432' },
+    port: { type: 'number', placeholder: '3306' },
     database: {},
     user: {},
     password: { type: 'password', sensitive: true },
@@ -70,5 +70,5 @@ export const dataSourceFactory: DataSourceFactory = {
     cert: { label: 'Client Certificate', sensitive: true },
     key: { label: 'Client Key', sensitive: true },
   },
-  create: () => new PostgresDataSource(),
+  create: () => new MysqlDataSource(),
 };

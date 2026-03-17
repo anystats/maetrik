@@ -121,6 +121,19 @@ export interface CredentialsFieldDefinition {
 
 export type CredentialsFieldDefinitions = Record<string, CredentialsFieldDefinition>;
 
+/**
+ * Enriched field definition for API consumers (frontend form builder).
+ * Merges UI metadata from credentialsFields with validation info from credentialsSchema.
+ */
+export interface OptionsFieldDefinition extends CredentialsFieldDefinition {
+  /** Whether the field is required */
+  required?: boolean;
+  /** Default value from the schema */
+  default?: unknown;
+}
+
+export type OptionsFieldDefinitions = Record<string, OptionsFieldDefinition>;
+
 // ============================================
 // Factory Interfaces
 // ============================================
@@ -159,5 +172,7 @@ export interface ResolvedDataSourceFactory {
   /** Zod schema converted from JSON Schema for internal validation */
   readonly credentialsSchema: unknown;
   readonly credentialsFields?: CredentialsFieldDefinitions;
+  /** Enriched field definitions for API/frontend (merged schema + UI metadata) */
+  readonly optionsFields?: OptionsFieldDefinitions;
   create(): DataSourceDriver;
 }

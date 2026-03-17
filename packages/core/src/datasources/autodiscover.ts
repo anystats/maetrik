@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { DataSourceFactory, ResolvedDataSourceFactory, DataSourceCapabilities } from '@maetrik/shared';
+import type { DataSourceFactory, ResolvedDataSourceFactory, DataSourceCapabilities, OptionsFieldDefinitions } from '@maetrik/shared';
 import { JSONSchemaToZod, type JSONSchema } from '@dmitryrechkin/json-schema-to-zod';
 
 export interface DiscoveredDataSource {
@@ -71,6 +71,31 @@ function deriveCapabilities(factory: DataSourceFactory): DataSourceCapabilities 
   };
 }
 
+/**
+ * Build optionsFields by merging credentialsFields UI metadata
+ * with required/default info from the JSON Schema.
+ */
+function buildOptionsFields(factory: DataSourceFactory): OptionsFieldDefinitions | undefined {
+  const schema = factory.credentialsSchema;
+  const fields = factory.credentialsFields;
+  if (!fields) return undefined;
+
+  const requiredSet = new Set(
+    Array.isArray(schema.required) ? schema.required : []
+  );
+  const properties = (schema.properties ?? {}) as Record<string, { default?: unknown }>;
+
+  const result: OptionsFieldDefinitions = {};
+  for (const [key, field] of Object.entries(fields)) {
+    result[key] = {
+      ...field,
+      required: requiredSet.has(key),
+      default: properties[key]?.default,
+    };
+  }
+  return result;
+}
+
 function resolveFactory(factory: DataSourceFactory, icon: string | undefined): ResolvedDataSourceFactory {
   // Convert JSON Schema to Zod for internal validation
   const zodSchema = JSONSchemaToZod.convert(factory.credentialsSchema as JSONSchema);
@@ -83,6 +108,7 @@ function resolveFactory(factory: DataSourceFactory, icon: string | undefined): R
     capabilities: deriveCapabilities(factory),
     credentialsSchema: zodSchema,
     credentialsFields: factory.credentialsFields,
+    optionsFields: buildOptionsFields(factory),
     create: () => factory.create(),
   };
 }

@@ -24,6 +24,9 @@ export {
   // Credentials field definitions
   type CredentialsFieldDefinition,
   type CredentialsFieldDefinitions,
+  // Options field definitions (enriched for frontend)
+  type OptionsFieldDefinition,
+  type OptionsFieldDefinitions,
   // Schema types (new versions with different shapes)
   type QueryResult as DataSourceQueryResult,
   type SchemaColumn as DataSourceSchemaColumn,

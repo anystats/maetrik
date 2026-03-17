@@ -122,6 +122,7 @@ export function createDataSourceManager(options: DataSourceManagerOptions): Data
         displayName: factory.displayName,
         description: factory.description,
         icon: factory.icon,
+        optionsFields: factory.optionsFields,
       }));
     },
 

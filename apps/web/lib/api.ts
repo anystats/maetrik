@@ -15,16 +15,26 @@ export interface ConnectionDetails extends Connection {
   credentials?: Record<string, unknown>;
 }
 
+export interface ConnectionOptions {
+  timeoutMs?: number;
+  idleTimeoutMs?: number;
+  maxConnections?: number;
+  maxRetries?: number;
+  retryDelayMs?: number;
+}
+
 export interface CreateConnectionInput {
   id: string;
   type: string;
   credentials: Record<string, unknown>;
+  connection?: ConnectionOptions;
   name?: string;
   description?: string;
 }
 
 export interface UpdateConnectionInput {
   credentials?: Record<string, unknown>;
+  connection?: ConnectionOptions;
   name?: string;
   description?: string;
   enabled?: boolean;
@@ -114,11 +124,22 @@ export async function testConnection(id: string): Promise<HealthCheckResult> {
 }
 
 // Data source types
+export interface OptionsFieldDefinition {
+  label?: string;
+  type?: 'text' | 'password' | 'number' | 'boolean';
+  placeholder?: string;
+  helpText?: string;
+  sensitive?: boolean;
+  required?: boolean;
+  default?: unknown;
+}
+
 export interface DataSourceType {
   type: string;
   name: string;
   description?: string;
   image?: string;  // Base64 data URI
+  optionsFields?: Record<string, OptionsFieldDefinition>;
 }
 
 export async function listDataSourceTypes(): Promise<DataSourceType[]> {

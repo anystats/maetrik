@@ -16,6 +16,7 @@ export function createDataSourcesRouter(options: DataSourcesRouterOptions): Rout
       name: t.displayName,
       description: t.description,
       image: t.icon,
+      optionsFields: t.optionsFields,
     }));
     res.json({ success: true, data: types });
   });

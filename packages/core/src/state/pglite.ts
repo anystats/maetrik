@@ -68,7 +68,7 @@ export class PGLiteStateDatabase implements StateDatabase {
         input.name ?? null,
         input.description ?? null,
         false,  // Connections always start disabled
-        JSON.stringify({}),  // Empty meta
+        JSON.stringify(input.connection ? { connection: input.connection } : {}),
       ]
     );
   }
@@ -120,6 +120,10 @@ export class PGLiteStateDatabase implements StateDatabase {
     if (input.enabled !== undefined) {
       sets.push(`enabled = $${paramIndex++}`);
       params.push(input.enabled);
+    }
+    if (input.connection !== undefined) {
+      sets.push(`meta = jsonb_set(COALESCE(meta, '{}'), '{connection}', $${paramIndex++}::jsonb)`);
+      params.push(JSON.stringify(input.connection));
     }
 
     params.push(id);

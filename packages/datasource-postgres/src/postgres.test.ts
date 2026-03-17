@@ -26,7 +26,8 @@ vi.mock('pg', () => ({
   default: { Pool: MockPool },
 }));
 
-import { dataSourceFactory, PostgresDataSource } from './index.js';
+import { dataSourceFactory } from './index.js';
+import { PostgresDataSource } from './driver.js';
 
 const config: DataSourceConfig = {
   id: 'test-pg',

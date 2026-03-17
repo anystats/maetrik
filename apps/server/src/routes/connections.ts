@@ -2,16 +2,26 @@ import { Router, Request, Response } from 'express';
 import type { DataSourceManager, StateDatabase, EncryptionManager } from '@maetrik/core';
 import { z } from 'zod';
 
+const connectionOptionsSchema = z.object({
+  timeoutMs: z.number().int().positive().optional(),
+  idleTimeoutMs: z.number().int().positive().optional(),
+  maxConnections: z.number().int().positive().optional(),
+  maxRetries: z.number().int().min(0).optional(),
+  retryDelayMs: z.number().int().positive().optional(),
+}).optional();
+
 const createConnectionSchema = z.object({
   id: z.string().min(1).max(100).regex(/^[a-z0-9-_]+$/i, 'ID must be alphanumeric with dashes/underscores'),
   type: z.string().min(1),
   credentials: z.record(z.string(), z.unknown()),
+  connection: connectionOptionsSchema,
   name: z.string().optional(),
   description: z.string().optional(),
 });
 
 const updateConnectionSchema = z.object({
   credentials: z.record(z.string(), z.unknown()).optional(),
+  connection: connectionOptionsSchema,
   name: z.string().optional(),
   description: z.string().optional(),
   enabled: z.boolean().optional(),
@@ -229,7 +239,7 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       return;
     }
 
-    const { id, type, credentials, name, description } = parsed.data;
+    const { id, type, credentials, connection, name, description } = parsed.data;
 
     // Check if ID exists in file config (can't override)
     const canAdd = await dataSourceManager.canAddToDatabase(id);
@@ -269,7 +279,7 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       }
     }
 
-    await options.stateDb.createConnection({ id, type, credentials: encryptedCredentials, name, description });
+    await options.stateDb.createConnection({ id, type, credentials: encryptedCredentials, connection, name, description });
 
     res.status(201).json({
       success: true,
@@ -335,7 +345,7 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
     }
 
     // Encrypt sensitive credentials if provided
-    let updateData = parsed.data;
+    let updateData: Record<string, unknown> = { ...parsed.data };
     if (parsed.data.credentials && options.encryptionManager) {
       const factory = dataSourceManager.getFactory(existing.type);
       if (factory?.credentialsFields) {

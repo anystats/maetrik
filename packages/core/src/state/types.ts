@@ -14,16 +14,17 @@ export interface CreateConnectionInput {
   id: string;
   type: string;
   credentials: Record<string, unknown>;
+  connection?: Record<string, unknown>;
   name?: string;
   description?: string;
 }
 
 export interface UpdateConnectionInput {
   credentials?: Record<string, unknown>;
+  connection?: Record<string, unknown>;
   name?: string;
   description?: string;
   enabled?: boolean;
-  // Note: meta not in update input - server-managed only
 }
 
 export interface StateDatabase {
