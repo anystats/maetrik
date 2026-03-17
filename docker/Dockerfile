@@ -49,6 +49,8 @@ COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
 COPY --from=deps /app/packages/datasource-postgres/node_modules ./packages/datasource-postgres/node_modules
 COPY --from=deps /app/apps/server/node_modules ./apps/server/node_modules
 
+RUN mkdir -p /app/data
+
 EXPOSE 3000
 
 CMD ["node", "apps/server/dist/index.js"]

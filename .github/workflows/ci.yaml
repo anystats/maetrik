@@ -23,7 +23,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter '!apps-docs' typecheck
+      - run: pnpm typecheck
 
   test:
     runs-on: ubuntu-latest
@@ -41,9 +41,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter '!apps-docs' build
+      - run: pnpm build
 
-      - run: pnpm --filter '!apps-docs' test
+      - run: pnpm test
 
   build:
     runs-on: ubuntu-latest
@@ -61,7 +61,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter '!apps-docs' build
+      - run: pnpm build
 
   docker:
     runs-on: ubuntu-latest
