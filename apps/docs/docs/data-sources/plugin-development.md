@@ -46,6 +46,7 @@ datasource-mydb/
 - Must be ESM (`"type": "module"`)
 - Entry point must export `dataSourceFactory`
 - Peer depend on `@maetrik/shared` for types
+- Must ship compiled JavaScript (see [Building](#building))
 
 ## Driver Class
 
@@ -220,3 +221,46 @@ credentialsFields: {
 | `placeholder` | `string` | Placeholder text |
 | `helpText` | `string` | Help text shown below the field |
 | `sensitive` | `boolean` | If `true`, the field is encrypted at rest and never exposed in API responses |
+
+## Building
+
+Maetrik's autodiscovery uses `import()` to load the file referenced by your `package.json` entry point (`exports['.'].import` or `main`). **Plugins must always ship compiled JavaScript** — the entry point must resolve to a valid `.js` file.
+
+### TypeScript plugins
+
+Compile your TypeScript source to `dist/` and point your entry to the compiled output:
+
+```json title="package.json"
+{
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  }
+}
+```
+
+Run `npm run build` after any source changes. During development, use `npm run dev` to recompile automatically.
+
+### JavaScript plugins
+
+Point your entry point directly to your source file:
+
+```json title="package.json"
+{
+  "main": "./src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    }
+  }
+}
+```
+
+Make sure the file is valid ESM (uses `import`/`export`, not `require`).
