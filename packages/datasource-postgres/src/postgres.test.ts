@@ -4,8 +4,11 @@ import type { DataSourceConfig } from '@maetrik/shared';
 
 vi.mock('pg', () => ({
   default: {
-    Client: vi.fn().mockImplementation(() => ({
-      connect: vi.fn().mockResolvedValue(undefined),
+    Pool: vi.fn().mockImplementation(() => ({
+      connect: vi.fn().mockResolvedValue({
+        query: vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }], rowCount: 1, fields: [] }),
+        release: vi.fn(),
+      }),
       end: vi.fn().mockResolvedValue(undefined),
       query: vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }], rowCount: 1, fields: [] }),
     })),

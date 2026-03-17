@@ -16,7 +16,7 @@ import {
   type Transactional,
 } from '@maetrik/shared';
 
-const { Client } = pg;
+const { Pool } = pg;
 
 // JSON Schema for PostgreSQL credentials (standard, portable format)
 const postgresCredentialsSchema: JSONSchema7 = {
@@ -66,6 +66,24 @@ const postgresCredentialsSchema: JSONSchema7 = {
       type: 'string',
       description: 'Client private key for mutual TLS (PEM format)',
     },
+    maxConnections: {
+      type: 'integer',
+      default: 10,
+      minimum: 1,
+      description: 'Maximum number of connections in the pool',
+    },
+    idleTimeoutMs: {
+      type: 'integer',
+      default: 30000,
+      minimum: 0,
+      description: 'Close idle connections after this many milliseconds (0 to disable)',
+    },
+    connectionTimeoutMs: {
+      type: 'integer',
+      default: 5000,
+      minimum: 0,
+      description: 'Maximum time to wait for a connection from the pool (ms)',
+    },
   },
 };
 
@@ -80,13 +98,16 @@ interface PostgresCredentials {
   ca?: string;
   cert?: string;
   key?: string;
+  maxConnections?: number;
+  idleTimeoutMs?: number;
+  connectionTimeoutMs?: number;
 }
 
 export class PostgresDataSource
   extends BaseDataSourceDriver
   implements Queryable, Introspectable, HealthCheckable, Transactional
 {
-  private client: InstanceType<typeof Client> | null = null;
+  private pool: InstanceType<typeof Pool> | null = null;
   private _name: string = '';
   readonly type = 'postgres';
   readonly queryLanguage: QueryLanguage = 'sql';
@@ -115,7 +136,7 @@ export class PostgresDataSource
       });
     }
 
-    this.client = new Client({
+    this.pool = new Pool({
       host: creds.host,
       port: creds.port ?? 5432,
       database: creds.database,
@@ -129,25 +150,31 @@ export class PostgresDataSource
             key: creds.key,
           }
         : undefined,
+      max: creds.maxConnections ?? 10,
+      idleTimeoutMillis: creds.idleTimeoutMs ?? 30000,
+      connectionTimeoutMillis: creds.connectionTimeoutMs ?? 5000,
     });
 
+    // Verify connectivity by acquiring and releasing a connection
     try {
-      await this.client.connect();
+      const client = await this.pool.connect();
+      client.release();
     } catch (err) {
-      this.client = null;
+      await this.pool.end();
+      this.pool = null;
       throw this.wrapError(err);
     }
   }
 
   async shutdown(): Promise<void> {
-    if (this.client) {
-      await this.client.end();
-      this.client = null;
+    if (this.pool) {
+      await this.pool.end();
+      this.pool = null;
     }
   }
 
   async execute(sql: string, params?: unknown[]): Promise<QueryResult> {
-    if (!this.client) {
+    if (!this.pool) {
       throw new DataSourceError({
         code: 'NOT_INITIALIZED',
         message: 'Data source not initialized',
@@ -156,7 +183,7 @@ export class PostgresDataSource
     }
 
     try {
-      const result = await this.client.query(sql, params);
+      const result = await this.pool.query(sql, params);
       return {
         rows: result.rows,
         rowCount: result.rowCount ?? 0,
@@ -168,7 +195,7 @@ export class PostgresDataSource
   }
 
   async introspect(): Promise<SchemaDefinition> {
-    if (!this.client) {
+    if (!this.pool) {
       throw new DataSourceError({
         code: 'NOT_INITIALIZED',
         message: 'Data source not initialized',
@@ -177,7 +204,7 @@ export class PostgresDataSource
     }
 
     try {
-      const tablesResult = await this.client.query(`
+      const tablesResult = await this.pool.query(`
         SELECT table_schema, table_name
         FROM information_schema.tables
         WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
@@ -187,7 +214,7 @@ export class PostgresDataSource
       const tables: SchemaTable[] = [];
 
       for (const row of tablesResult.rows) {
-        const columnsResult = await this.client.query(
+        const columnsResult = await this.pool.query(
           `
           SELECT
             c.column_name,
@@ -229,9 +256,9 @@ export class PostgresDataSource
   }
 
   async healthCheck(): Promise<boolean> {
-    if (!this.client) return false;
+    if (!this.pool) return false;
     try {
-      await this.client.query('SELECT 1');
+      await this.pool.query('SELECT 1');
       return true;
     } catch {
       return false;
@@ -239,7 +266,7 @@ export class PostgresDataSource
   }
 
   async beginTransaction(): Promise<Transaction> {
-    if (!this.client) {
+    if (!this.pool) {
       throw new DataSourceError({
         code: 'NOT_INITIALIZED',
         message: 'Data source not initialized',
@@ -247,16 +274,24 @@ export class PostgresDataSource
       });
     }
 
+    let client: pg.PoolClient;
     try {
-      await this.client.query('BEGIN');
+      client = await this.pool.connect();
     } catch (err) {
+      throw this.wrapError(err);
+    }
+
+    try {
+      await client.query('BEGIN');
+    } catch (err) {
+      client.release();
       throw this.wrapError(err);
     }
 
     return {
       execute: async (sql: string, params?: unknown[]): Promise<QueryResult> => {
         try {
-          const result = await this.client!.query(sql, params);
+          const result = await client.query(sql, params);
           return {
             rows: result.rows,
             rowCount: result.rowCount ?? 0,
@@ -268,16 +303,16 @@ export class PostgresDataSource
       },
       commit: async (): Promise<void> => {
         try {
-          await this.client!.query('COMMIT');
-        } catch (err) {
-          throw this.wrapError(err);
+          await client.query('COMMIT');
+        } finally {
+          client.release();
         }
       },
       rollback: async (): Promise<void> => {
         try {
-          await this.client!.query('ROLLBACK');
-        } catch (err) {
-          throw this.wrapError(err);
+          await client.query('ROLLBACK');
+        } finally {
+          client.release();
         }
       },
     };
@@ -389,6 +424,9 @@ export const dataSourceFactory: DataSourceFactory = {
     ca: { label: 'CA Certificate', sensitive: true },
     cert: { label: 'Client Certificate', sensitive: true },
     key: { label: 'Client Key', sensitive: true },
+    maxConnections: { type: 'number', label: 'Max Connections', placeholder: '10' },
+    idleTimeoutMs: { type: 'number', label: 'Idle Timeout (ms)', placeholder: '30000' },
+    connectionTimeoutMs: { type: 'number', label: 'Connection Timeout (ms)', placeholder: '5000' },
   },
   create: () => new PostgresDataSource(),
 };
