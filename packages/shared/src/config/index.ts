@@ -78,6 +78,14 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<Maetr
 
   const validated = maetrikConfigSchema.parse(fileConfig);
 
+  // Environment variable overrides (useful for Docker and CI)
+  if (env.MAETRIK_SERVER_HOST) {
+    validated.server.host = env.MAETRIK_SERVER_HOST;
+  }
+  if (env.MAETRIK_SERVER_PORT) {
+    validated.server.port = Number(env.MAETRIK_SERVER_PORT);
+  }
+
   return validated as MaetrikConfig;
 }
 

@@ -31,6 +31,7 @@ RUN pnpm --filter @maetrik/server... build
 FROM base AS runner
 
 ENV NODE_ENV=production
+ENV MAETRIK_SERVER_HOST=0.0.0.0
 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
