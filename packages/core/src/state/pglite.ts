@@ -7,7 +7,6 @@ import type {
   HealthBucketRow,
   HealthStatus,
 } from './types.js';
-import { DEFAULT_HEALTH_THRESHOLDS } from './types.js';
 
 const SEVERITY: Record<string, number> = { green: 0, yellow: 1, red: 2 };
 
