@@ -37,6 +37,14 @@ export class PGLiteStateDatabase implements StateDatabase {
       )
     `);
 
+    // Migrate existing databases: add health columns if missing
+    await this.db.exec(`
+      ALTER TABLE connections ADD COLUMN IF NOT EXISTS health_status TEXT NOT NULL DEFAULT 'green'
+    `);
+    await this.db.exec(`
+      ALTER TABLE connections ADD COLUMN IF NOT EXISTS health_thresholds JSONB NOT NULL DEFAULT '{"connection_ms": 2000}'
+    `);
+
     await this.db.exec(`
       CREATE TABLE IF NOT EXISTS connection_health_log (
         connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
