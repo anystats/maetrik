@@ -7,6 +7,7 @@ import {
   createEncryptionManager,
   plaintextDriverFactory,
   envKeyDriverFactory,
+  HealthMonitor,
 } from '@maetrik/core';
 
 const logger = createLogger('server');
@@ -83,6 +84,14 @@ async function main() {
     logger.warn('No LLM configuration provided, /api/v1/ask endpoint will not work');
   }
 
+  // Start health monitor
+  const healthMonitor = new HealthMonitor({
+    stateDb,
+    dataSourceManager,
+  });
+  healthMonitor.start();
+  logger.info('Health monitor started');
+
   const { port, host } = config.server;
 
   const server = app.listen(port, host, () => {
@@ -104,6 +113,9 @@ async function main() {
           error: error instanceof Error ? error.message : String(error),
         });
       }
+
+      healthMonitor.stop();
+      logger.info('Health monitor stopped');
 
       // Note: No dataSourceManager.shutdown() - connections are caller-managed now
 
