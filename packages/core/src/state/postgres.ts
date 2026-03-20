@@ -47,7 +47,7 @@ export class PostgresStateDatabase implements StateDatabase {
 
     await this.client.query(`
       CREATE TABLE IF NOT EXISTS connection_health_log (
-        connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+        connection_id TEXT NOT NULL,
         bucket_start TIMESTAMPTZ NOT NULL,
         health_status TEXT NOT NULL DEFAULT 'green',
         degradation_message TEXT,
@@ -58,6 +58,11 @@ export class PostgresStateDatabase implements StateDatabase {
     // Migrate existing tables: TIMESTAMP -> TIMESTAMPTZ for correct timezone handling
     await this.client.query(`
       ALTER TABLE connection_health_log ALTER COLUMN bucket_start TYPE TIMESTAMPTZ
+    `);
+
+    // Drop FK constraint so health logs can track file-config connections too
+    await this.client.query(`
+      ALTER TABLE connection_health_log DROP CONSTRAINT IF EXISTS connection_health_log_connection_id_fkey
     `);
   }
 

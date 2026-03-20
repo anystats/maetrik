@@ -34,6 +34,7 @@ describe('HealthMonitor', () => {
 
     dataSourceManager = {
       connectById: vi.fn(),
+      listConfigs: vi.fn().mockResolvedValue([]),
     } as unknown as DataSourceManager;
 
     monitor = new HealthMonitor({ stateDb, dataSourceManager, intervalMs: 60000 });
@@ -45,6 +46,9 @@ describe('HealthMonitor', () => {
 
   it('skips check when current bucket already exists', async () => {
     const bucket = currentBucketStart();
+    (dataSourceManager.listConfigs as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'conn-1', type: 'postgres', credentials: {} },
+    ]);
     (stateDb.listConnections as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'conn-1', type: 'postgres', enabled: true, health_status: 'green', health_thresholds: { connection_ms: 2000 } },
     ]);
@@ -63,6 +67,9 @@ describe('HealthMonitor', () => {
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
 
+    (dataSourceManager.listConfigs as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'conn-1', type: 'postgres', credentials: {} },
+    ]);
     (stateDb.listConnections as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'conn-1', type: 'postgres', enabled: true, health_status: 'green', health_thresholds: { connection_ms: 2000 } },
     ]);
@@ -85,6 +92,9 @@ describe('HealthMonitor', () => {
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
 
+    (dataSourceManager.listConfigs as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'conn-1', type: 'postgres', credentials: {} },
+    ]);
     (stateDb.listConnections as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'conn-1', type: 'postgres', enabled: true, health_status: 'green', health_thresholds: { connection_ms: 2000 } },
     ]);
@@ -104,6 +114,9 @@ describe('HealthMonitor', () => {
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
 
+    (dataSourceManager.listConfigs as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'conn-1', type: 'postgres', credentials: {} },
+    ]);
     (stateDb.listConnections as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'conn-1', type: 'postgres', enabled: true, health_status: 'green', health_thresholds: { connection_ms: 10 } },
     ]);
@@ -116,6 +129,9 @@ describe('HealthMonitor', () => {
   });
 
   it('marks connection red on connect failure', async () => {
+    (dataSourceManager.listConfigs as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'conn-1', type: 'postgres', credentials: {} },
+    ]);
     (stateDb.listConnections as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'conn-1', type: 'postgres', enabled: true, health_status: 'green', health_thresholds: { connection_ms: 2000 } },
     ]);
@@ -128,6 +144,9 @@ describe('HealthMonitor', () => {
   });
 
   it('skips disabled connections', async () => {
+    (dataSourceManager.listConfigs as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'conn-1', type: 'postgres', credentials: {} },
+    ]);
     (stateDb.listConnections as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'conn-1', type: 'postgres', enabled: false, health_status: 'green', health_thresholds: { connection_ms: 2000 } },
     ]);
@@ -137,7 +156,31 @@ describe('HealthMonitor', () => {
     expect(dataSourceManager.connectById).not.toHaveBeenCalled();
   });
 
+  it('checks file-config connections with default thresholds', async () => {
+    const mockDriver = {
+      isHealthCheckable: () => true,
+      healthCheck: vi.fn().mockResolvedValue(true),
+      shutdown: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // File-config connection: exists in listConfigs but NOT in stateDb.listConnections
+    (dataSourceManager.listConfigs as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'file-conn', type: 'postgres', credentials: {} },
+    ]);
+    (stateDb.listConnections as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (stateDb.getHealthStats as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (dataSourceManager.connectById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDriver);
+
+    await monitor.runOnce();
+
+    expect(dataSourceManager.connectById).toHaveBeenCalledWith('file-conn');
+    expect(stateDb.upsertHealthStats).toHaveBeenCalled();
+  });
+
   it('prunes old stats on each run', async () => {
+    (dataSourceManager.listConfigs as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'conn-1', type: 'postgres', credentials: {} },
+    ]);
     (stateDb.listConnections as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'conn-1', type: 'postgres', enabled: true, health_status: 'green', health_thresholds: { connection_ms: 2000 } },
     ]);

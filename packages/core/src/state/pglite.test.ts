@@ -191,12 +191,13 @@ describe('PGLiteStateDatabase', () => {
       expect(Math.abs(stats[0].bucket_start.getTime() - recent.getTime())).toBeLessThanOrEqual(3600000);
     });
 
-    it('cascade deletes health stats when connection is deleted', async () => {
+    it('health stats persist independently of connections', async () => {
       const bucket = new Date('2026-03-20T10:00:00Z');
       await db.upsertHealthStats('health-test', bucket, 'green');
       await db.deleteConnection('health-test');
+      // Stats remain (no FK cascade) — cleaned by pruneHealthStats instead
       const stats = await db.getHealthStats('health-test');
-      expect(stats).toHaveLength(0);
+      expect(stats).toHaveLength(1);
     });
   });
 });

@@ -1,4 +1,5 @@
-import type { StateDatabase, HealthStatus } from '../state/types.js';
+import type { StateDatabase, HealthStatus, ConnectionRow } from '../state/types.js';
+import { DEFAULT_HEALTH_THRESHOLDS } from '../state/types.js';
 import type { DataSourceManager } from '../datasources/types.js';
 
 const BUCKET_MS = 30 * 60 * 1000; // 30 minutes
@@ -38,24 +39,34 @@ export class HealthMonitor {
   }
 
   async runOnce(): Promise<void> {
-    const connections = await this.stateDb.listConnections();
+    // Use dataSourceManager to get ALL connections (file-config + database-stored)
+    const configs = await this.dataSourceManager.listConfigs();
+    // Get database connections for metadata (enabled flag, thresholds)
+    const dbConnections = await this.stateDb.listConnections();
+    const dbMap = new Map<string, ConnectionRow>(dbConnections.map(c => [c.id, c]));
+
     const bucketStart = computeBucketStart();
 
-    for (const conn of connections) {
-      if (!conn.enabled) continue;
+    for (const config of configs) {
+      const dbConn = dbMap.get(config.id);
+      // File-config connections are always enabled; DB connections check enabled flag
+      const enabled = dbConn?.enabled ?? true;
+      if (!enabled) continue;
+
+      const thresholds = dbConn?.health_thresholds ?? DEFAULT_HEALTH_THRESHOLDS;
 
       // Prune old stats
-      await this.stateDb.pruneHealthStats(conn.id);
+      await this.stateDb.pruneHealthStats(config.id);
 
       // Check if current bucket already has a record
-      const stats = await this.stateDb.getHealthStats(conn.id);
+      const stats = await this.stateDb.getHealthStats(config.id);
       const hasBucket = stats.some(
         (s) => s.bucket_start.getTime() === bucketStart.getTime()
       );
       if (hasBucket) continue;
 
       // No bucket — run healthcheck
-      await this.checkConnection(conn.id, conn.health_thresholds, bucketStart);
+      await this.checkConnection(config.id, thresholds, bucketStart);
     }
   }
 
