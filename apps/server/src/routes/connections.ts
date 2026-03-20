@@ -1,6 +1,11 @@
 import { Router, Request, Response } from 'express';
-import type { DataSourceManager, StateDatabase, EncryptionManager } from '@maetrik/core';
+import type { DataSourceManager, StateDatabase, EncryptionManager, HealthStatus } from '@maetrik/core';
 import { z } from 'zod';
+
+const BUCKET_MS = 30 * 60 * 1000;
+function computeBucketStart(): Date {
+  return new Date(Math.floor(Date.now() / BUCKET_MS) * BUCKET_MS);
+}
 
 const connectionOptionsSchema = z.object({
   timeoutMs: z.number().int().positive().optional(),
@@ -50,7 +55,12 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
     const dbConnections = options.stateDb
       ? await options.stateDb.listConnections()
       : [];
-    const metadataMap = new Map(dbConnections.map(c => [c.id, { name: c.name, description: c.description, enabled: c.enabled }]));
+    const metadataMap = new Map(dbConnections.map(c => [c.id, {
+      name: c.name,
+      description: c.description,
+      enabled: c.enabled,
+      health_status: c.health_status,
+    }]));
 
     const connectionList = configs.map((config) => {
       const metadata = metadataMap.get(config.id);
@@ -61,6 +71,7 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
         description: metadata?.description,
         // File-config connections are always enabled, DB connections have explicit enabled flag
         enabled: metadata?.enabled ?? true,
+        health_status: metadata?.health_status ?? 'green',
       };
     });
 
@@ -68,6 +79,27 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       success: true,
       data: connectionList,
     });
+  });
+
+  // GET /api/v1/connections/:id/health/log - Get health stats log
+  router.get('/:id/health/log', async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    if (!(await dataSourceManager.hasConnection(id))) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'CONNECTION_NOT_FOUND', message: `Connection '${id}' not found` },
+      });
+      return;
+    }
+
+    if (!options.stateDb) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
+    const stats = await options.stateDb.getHealthStats(id);
+    res.json({ success: true, data: stats });
   });
 
   // GET /api/v1/connections/:id - Get connection details
@@ -91,6 +123,8 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
           description: dbConnection?.description,
           // File-config connections are always enabled, DB connections have explicit enabled flag
           enabled: dbConnection?.enabled ?? true,
+          health_status: dbConnection?.health_status ?? 'green',
+          health_thresholds: dbConnection?.health_thresholds ?? { connection_ms: 2000 },
           options: {
             credentials: config.credentials,
             connection: config.connection,
@@ -123,34 +157,86 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       return;
     }
 
+    // Look up thresholds from stateDb if available
+    const defaultThresholds = { connection_ms: 2000 };
+    let thresholds = defaultThresholds;
+    if (options.stateDb) {
+      const dbConn = await options.stateDb.getConnection(id);
+      if (dbConn?.health_thresholds) {
+        thresholds = dbConn.health_thresholds;
+      }
+    }
+
     let dataSource;
+    const startMs = Date.now();
     try {
       dataSource = await dataSourceManager.connectById(id);
     } catch {
+      const responseMs = Date.now() - startMs;
+      const healthStatus: HealthStatus = 'red';
+
+      if (options.stateDb) {
+        const bucketStart = computeBucketStart();
+        await options.stateDb.upsertHealthStats(id, bucketStart, healthStatus, 'Connection failed');
+        await options.stateDb.updateConnectionHealth(id, healthStatus);
+      }
+
       res.json({
         success: true,
-        data: { healthy: false },
+        data: { healthy: false, health_status: healthStatus, response_ms: responseMs },
       });
       return;
     }
 
     try {
+      let healthy: boolean;
+      let responseMs: number;
+
       if (dataSource.isHealthCheckable()) {
-        const healthy = await dataSource.healthCheck();
-        res.json({
-          success: true,
-          data: { healthy },
-        });
+        healthy = await dataSource.healthCheck();
+        responseMs = Date.now() - startMs;
       } else {
-        res.json({
-          success: true,
-          data: { healthy: true, note: 'Health check not supported' },
-        });
+        healthy = true;
+        responseMs = Date.now() - startMs;
       }
-    } catch {
+
+      // Determine health_status
+      let healthStatus: HealthStatus;
+      let message: string | undefined;
+      if (!healthy) {
+        healthStatus = 'red';
+        message = 'Health check failed';
+      } else if (responseMs > thresholds.connection_ms) {
+        healthStatus = 'yellow';
+        message = `Slow response: ${responseMs}ms`;
+      } else {
+        healthStatus = 'green';
+      }
+
+      // Write stats if stateDb available
+      if (options.stateDb) {
+        const bucketStart = computeBucketStart();
+        await options.stateDb.upsertHealthStats(id, bucketStart, healthStatus, message);
+        await options.stateDb.updateConnectionHealth(id, healthStatus);
+      }
+
       res.json({
         success: true,
-        data: { healthy: false },
+        data: { healthy, health_status: healthStatus, response_ms: responseMs },
+      });
+    } catch {
+      const responseMs = Date.now() - startMs;
+      const healthStatus: HealthStatus = 'red';
+
+      if (options.stateDb) {
+        const bucketStart = computeBucketStart();
+        await options.stateDb.upsertHealthStats(id, bucketStart, healthStatus, 'Health check threw error');
+        await options.stateDb.updateConnectionHealth(id, healthStatus);
+      }
+
+      res.json({
+        success: true,
+        data: { healthy: false, health_status: healthStatus, response_ms: responseMs },
       });
     } finally {
       await dataSource.shutdown();

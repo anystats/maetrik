@@ -144,6 +144,56 @@ describe('Connections API', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.healthy).toBe(true);
     });
+
+    it('returns health status with response time', async () => {
+      const response = await request(app).get('/api/v1/connections/main/health');
+      expect(response.status).toBe(200);
+      expect(response.body.data.healthy).toBe(true);
+      expect(response.body.data.health_status).toBe('green');
+      expect(response.body.data).toHaveProperty('response_ms');
+    });
+  });
+
+  describe('GET /api/v1/connections/:id/health/log', () => {
+    let stateDb: PGLiteStateDatabase;
+
+    beforeEach(async () => {
+      stateDb = new PGLiteStateDatabase('memory://connections-test-health-log');
+      await stateDb.initialize();
+      await stateDb.execute('DELETE FROM connections');
+    });
+
+    afterEach(async () => {
+      await stateDb.shutdown();
+    });
+
+    it('returns empty array when no stats exist', async () => {
+      const appWithDb = createApp({
+        dataSourceManager: mockDataSourceManager,
+        stateDb,
+      });
+
+      const response = await request(appWithDb).get('/api/v1/connections/main/health/log');
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toEqual([]);
+    });
+
+    it('returns 404 for unknown connection', async () => {
+      const appWithDb = createApp({
+        dataSourceManager: mockDataSourceManager,
+        stateDb,
+      });
+
+      const response = await request(appWithDb).get('/api/v1/connections/unknown/health/log');
+      expect(response.status).toBe(404);
+    });
+
+    it('returns empty array when no stateDb', async () => {
+      const response = await request(app).get('/api/v1/connections/main/health/log');
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual([]);
+    });
   });
 
   describe('GET /api/v1/connections/:name/schema', () => {
