@@ -38,3 +38,6 @@ data/
 
 docs/plans/
 
+# Worktrees
+.worktrees/
+
