@@ -32,11 +32,6 @@ vi.mock('@maetrik/core', async (importOriginal) => {
         suggestedTables: [],
       }),
     })),
-    createSemanticLayer: vi.fn(() => ({
-      getSchema: vi.fn().mockReturnValue({ tables: {} }),
-      toSchemaDefinition: vi.fn().mockReturnValue({ tables: {} }),
-      inferRelationships: vi.fn(),
-    })),
   };
 });
 

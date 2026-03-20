@@ -1,11 +1,28 @@
 import { Router, Request, Response } from 'express';
-import type { DataSourceManager, LLMManager, QueryTranslator, SemanticLayer, StateDatabase } from '@maetrik/core';
+import type { DataSourceManager, LLMManager, QueryTranslator, StateDatabase } from '@maetrik/core';
+import type { SchemaDefinition, DataSourceSchemaDefinition } from '@maetrik/shared';
+
+// Convert array-based introspection schema to record-based schema for the translator
+function toTranslatorSchema(ds: DataSourceSchemaDefinition): SchemaDefinition {
+  const tables: SchemaDefinition['tables'] = {};
+  for (const table of ds.tables) {
+    tables[table.name] = {
+      name: table.name,
+      columns: table.columns.map((c) => ({
+        name: c.name,
+        type: c.type,
+        nullable: c.nullable,
+        primaryKey: c.isPrimaryKey,
+      })),
+    };
+  }
+  return { tables };
+}
 
 export interface AskRouterOptions {
   dataSourceManager: DataSourceManager;
   llmManager: LLMManager;
   queryTranslator: QueryTranslator;
-  semanticLayers: Map<string, SemanticLayer>;
   stateDb?: StateDatabase;
 }
 
@@ -42,53 +59,9 @@ function getDialect(type: string): string {
   return dialectMap[type] || type;
 }
 
-// Convert array-based schema to record-based schema for semantic layer
-interface ArraySchemaTable {
-  name: string;
-  schema: string;
-  columns: Array<{
-    name: string;
-    type: string;
-    nullable: boolean;
-    isPrimaryKey: boolean;
-  }>;
-}
-
-interface ArraySchema {
-  tables: ArraySchemaTable[];
-}
-
-interface RecordSchema {
-  tables: Record<string, {
-    name: string;
-    columns: Array<{
-      name: string;
-      type: string;
-      nullable: boolean;
-      primaryKey?: boolean;
-    }>;
-  }>;
-}
-
-function convertSchemaFormat(arraySchema: ArraySchema): RecordSchema {
-  const tables: RecordSchema['tables'] = {};
-  for (const table of arraySchema.tables) {
-    tables[table.name] = {
-      name: table.name,
-      columns: table.columns.map((col) => ({
-        name: col.name,
-        type: col.type,
-        nullable: col.nullable,
-        primaryKey: col.isPrimaryKey,
-      })),
-    };
-  }
-  return { tables };
-}
-
 export function createAskRouter(options: AskRouterOptions): Router {
   const router = Router();
-  const { dataSourceManager, queryTranslator, semanticLayers } = options;
+  const { dataSourceManager, queryTranslator } = options;
 
   router.post('/', async (req: Request, res: Response) => {
     const { question, connection } = req.body;
@@ -183,18 +156,9 @@ export function createAskRouter(options: AskRouterOptions): Router {
 
       const startTime = Date.now();
 
-      // Get schema (from semantic layer if available, otherwise introspect)
-      let semanticLayer = semanticLayers.get(connection);
-      if (!semanticLayer) {
-        const { createSemanticLayer } = await import('@maetrik/core');
-        const rawSchema = await dataSource.introspect();
-        const convertedSchema = convertSchemaFormat(rawSchema as ArraySchema);
-        semanticLayer = createSemanticLayer(convertedSchema);
-        semanticLayer.inferRelationships();
-        semanticLayers.set(connection, semanticLayer);
-      }
-
-      const schema = semanticLayer.toSchemaDefinition();
+      // Introspect schema and convert to translator format
+      const rawSchema = await dataSource.introspect();
+      const schema = toTranslatorSchema(rawSchema);
       const dialect = getDialect(dataSource.type);
 
       // Translate natural language to SQL

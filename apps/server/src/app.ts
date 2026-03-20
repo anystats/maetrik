@@ -9,7 +9,6 @@ import {
   createQueryTranslator,
   type LLMManager,
   type QueryTranslator,
-  type SemanticLayer,
   type DataSourceManager,
   type StateDatabase,
   type EncryptionManager,
@@ -34,7 +33,6 @@ export interface AppContext {
   dataSourceManager: DataSourceManager;
   llmManager: LLMManager;
   queryTranslator: QueryTranslator;
-  semanticLayers: Map<string, SemanticLayer>;
 }
 
 export function createApp(options: AppOptions): express.Express {
@@ -51,15 +49,11 @@ export function createApp(options: AppOptions): express.Express {
   // Create query translator (will be initialized when LLM is ready)
   const queryTranslator = createQueryTranslator(llmManager);
 
-  // Semantic layers cache (per connection)
-  const semanticLayers = new Map<string, SemanticLayer>();
-
   // Store context on app
   const context: AppContext = {
     dataSourceManager,
     llmManager,
     queryTranslator,
-    semanticLayers,
   };
   app.set('context', context);
 
@@ -113,7 +107,7 @@ export function createApp(options: AppOptions): express.Express {
   // Ask API (natural language)
   app.use(
     '/api/v1/ask',
-    createAskRouter({ dataSourceManager, llmManager, queryTranslator, semanticLayers })
+    createAskRouter({ dataSourceManager, llmManager, queryTranslator })
   );
 
   // Data Sources API
