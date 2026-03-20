@@ -15,6 +15,49 @@ export interface HealthBucketRow {
   degradation_message?: string;
 }
 
+export interface SchemeTable {
+  name: string;
+  columns: SchemeColumn[];
+  indexes?: SchemeIndex[];
+  foreignKeys?: SchemeForeignKey[];
+}
+
+export interface SchemeColumn {
+  name: string;
+  type: string;
+  nullable: boolean;
+}
+
+export interface SchemeIndex {
+  name: string;
+  columns: string[];
+  unique: boolean;
+  primaryKey?: boolean;
+}
+
+export interface SchemeForeignKey {
+  column: string;
+  referencesTable: string;
+  referencesColumn: string;
+}
+
+export interface ConnectionSchemeRow {
+  id: string;
+  connection_id: string;
+  version: string;
+  active: boolean;
+  tables: SchemeTable[];
+  created_at?: Date;
+}
+
+export interface SchemeEnrichmentRow {
+  connection_id: string;
+  table_name: string;
+  column_name: string | null;
+  description: string;
+  updated_at?: Date;
+}
+
 export interface ConnectionRow {
   id: string;
   type: string;
@@ -71,6 +114,17 @@ export interface StateDatabase {
   upsertHealthStats(connectionId: string, bucketStart: Date, healthStatus: HealthStatus, message?: string): Promise<void>;
   getHealthStats(connectionId: string): Promise<HealthBucketRow[]>;
   pruneHealthStats(connectionId: string): Promise<void>;
+
+  // Connection schemes
+  createScheme(connectionId: string, tables: SchemeTable[]): Promise<ConnectionSchemeRow>;
+  getActiveScheme(connectionId: string): Promise<ConnectionSchemeRow | null>;
+  getSchemeVersions(connectionId: string): Promise<{ id: string; version: string; active: boolean }[]>;
+  deactivateSchemes(connectionId: string): Promise<void>;
+
+  // Scheme enrichments
+  setEnrichment(connectionId: string, tableName: string, columnName: string | null, description: string): Promise<void>;
+  getEnrichments(connectionId: string): Promise<SchemeEnrichmentRow[]>;
+  deleteEnrichment(connectionId: string, tableName: string, columnName: string | null): Promise<void>;
 }
 
 export interface StateStorageConfig {
