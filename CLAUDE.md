@@ -73,6 +73,7 @@ Build order matters due to dependencies:
 - `sources/database.ts` - Loads connections from state database (mutable via API)
 - `resolver.ts` - Combines sources with duplicate validation
 - Same connection ID in both sources is an error
+- **Important:** All features must work uniformly for both file-config and database-stored connections. Use `dataSourceManager.listConfigs()` (not `stateDb.listConnections()`) when iterating over all connections.
 
 **State Database** (`packages/core/src/state/`):
 - Internal storage for app state (connections, future: queries, dashboards)
