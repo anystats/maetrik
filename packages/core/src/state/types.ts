@@ -1,3 +1,20 @@
+export type HealthStatus = 'green' | 'yellow' | 'red';
+
+export interface HealthThresholds {
+  connection_ms: number;
+}
+
+export const DEFAULT_HEALTH_THRESHOLDS: HealthThresholds = {
+  connection_ms: 2000,
+};
+
+export interface HealthBucketRow {
+  connection_id: string;
+  bucket_start: Date;
+  health_status: HealthStatus;
+  degradation_message?: string;
+}
+
 export interface ConnectionRow {
   id: string;
   type: string;
@@ -8,6 +25,8 @@ export interface ConnectionRow {
   name?: string;
   description?: string;
   enabled: boolean;
+  health_status: HealthStatus;
+  health_thresholds: HealthThresholds;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -46,6 +65,12 @@ export interface StateDatabase {
   connectionExists(id: string): Promise<boolean>;
   updateConnection(id: string, input: UpdateConnectionInput): Promise<void>;
   deleteConnection(id: string): Promise<void>;
+
+  // Health observability
+  updateConnectionHealth(id: string, healthStatus: HealthStatus): Promise<void>;
+  upsertHealthStats(connectionId: string, bucketStart: Date, healthStatus: HealthStatus, message?: string): Promise<void>;
+  getHealthStats(connectionId: string): Promise<HealthBucketRow[]>;
+  pruneHealthStats(connectionId: string): Promise<void>;
 }
 
 export interface StateStorageConfig {
