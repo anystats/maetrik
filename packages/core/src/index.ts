@@ -5,3 +5,4 @@ export * from './datasources/index.js';
 export * from './state/index.js';
 export * from './connections/index.js';
 export * from './encryption/index.js';
+export * from './health/index.js';
