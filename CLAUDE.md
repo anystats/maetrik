@@ -79,6 +79,15 @@ Build order matters due to dependencies:
 - `pglite.ts` - PGLite implementation (embedded, for npm/local)
 - `postgres.ts` - PostgreSQL implementation (for Docker/production)
 - `factory.ts` - Creates appropriate implementation based on config
+- Connections track `health_status` (green/yellow/red) and configurable `health_thresholds` (connection_ms)
+- `connection_health_log` table stores 30-min bucketed health stats (48h retention, worst-wins within bucket)
+
+**Health Monitor** (`packages/core/src/health/`):
+- Background service checking connection health on a configurable interval (default 5min)
+- Only runs healthcheck when current 30-min bucket has no record yet
+- Compares response time to per-connection `health_thresholds.connection_ms`
+- Green (healthy + fast), Yellow (healthy + slow), Red (failed)
+- Started/stopped in server lifecycle (`apps/server/src/index.ts`)
 
 **LLM Registry Pattern** (`packages/core/src/llm/`):
 - Same registry pattern as data sources
@@ -103,7 +112,8 @@ Build order matters due to dependencies:
 - `POST /api/v1/connections` - Create connection (database-stored only)
 - `PUT /api/v1/connections/:id` - Update connection (database-stored only)
 - `DELETE /api/v1/connections/:id` - Delete connection (database-stored only)
-- `GET /api/v1/connections/:id/health` - Test connection health
+- `GET /api/v1/connections/:id/health` - Test connection health (writes stats, returns health_status + response_ms)
+- `GET /api/v1/connections/:id/health/log` - Get 48h health stats history (30-min buckets)
 - `GET /api/v1/connections/:id/schema` - Introspect schema
 
 **Data Sources:**
