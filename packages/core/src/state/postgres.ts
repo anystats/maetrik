@@ -6,9 +6,18 @@ import type {
   UpdateConnectionInput,
   HealthBucketRow,
   HealthStatus,
+  SchemeTable,
+  ConnectionSchemeRow,
+  SchemeEnrichmentRow,
 } from './types.js';
 
 const SEVERITY: Record<string, number> = { green: 0, yellow: 1, red: 2 };
+
+function generateVersion(): string {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
+}
 
 export class PostgresStateDatabase implements StateDatabase {
   private client: Client | null = null;
@@ -63,6 +72,28 @@ export class PostgresStateDatabase implements StateDatabase {
     // Drop FK constraint so health logs can track file-config connections too
     await this.client.query(`
       ALTER TABLE connection_health_log DROP CONSTRAINT IF EXISTS connection_health_log_connection_id_fkey
+    `);
+
+    await this.client.query(`
+      CREATE TABLE IF NOT EXISTS connection_schemes (
+        id TEXT PRIMARY KEY,
+        connection_id TEXT NOT NULL,
+        version TEXT NOT NULL,
+        active BOOLEAN NOT NULL DEFAULT true,
+        tables JSONB NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await this.client.query(`
+      CREATE TABLE IF NOT EXISTS connection_scheme_enrichments (
+        connection_id TEXT NOT NULL,
+        table_name TEXT NOT NULL,
+        column_name TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (connection_id, table_name, column_name)
+      )
     `);
   }
 
@@ -207,6 +238,78 @@ export class PostgresStateDatabase implements StateDatabase {
     await this.client.query(
       "DELETE FROM connection_health_log WHERE connection_id = $1 AND bucket_start < NOW() - INTERVAL '48 hours'",
       [connectionId]
+    );
+  }
+
+  async createScheme(connectionId: string, tables: SchemeTable[]): Promise<ConnectionSchemeRow> {
+    if (!this.client) throw new Error('State database not initialized');
+    await this.deactivateSchemes(connectionId);
+    const id = crypto.randomUUID();
+    const version = generateVersion();
+    await this.client.query(
+      `INSERT INTO connection_schemes (id, connection_id, version, active, tables)
+       VALUES ($1, $2, $3, true, $4)`,
+      [id, connectionId, version, JSON.stringify(tables)]
+    );
+    return { id, connection_id: connectionId, version, active: true, tables };
+  }
+
+  async getActiveScheme(connectionId: string): Promise<ConnectionSchemeRow | null> {
+    if (!this.client) throw new Error('State database not initialized');
+    const result = await this.client.query(
+      'SELECT id, connection_id, version, active, tables, created_at FROM connection_schemes WHERE connection_id = $1 AND active = true',
+      [connectionId]
+    );
+    return (result.rows[0] as ConnectionSchemeRow) ?? null;
+  }
+
+  async getSchemeVersions(connectionId: string): Promise<{ id: string; version: string; active: boolean }[]> {
+    if (!this.client) throw new Error('State database not initialized');
+    const result = await this.client.query(
+      'SELECT id, version, active FROM connection_schemes WHERE connection_id = $1 ORDER BY version',
+      [connectionId]
+    );
+    return result.rows as { id: string; version: string; active: boolean }[];
+  }
+
+  async deactivateSchemes(connectionId: string): Promise<void> {
+    if (!this.client) throw new Error('State database not initialized');
+    await this.client.query(
+      'UPDATE connection_schemes SET active = false WHERE connection_id = $1 AND active = true',
+      [connectionId]
+    );
+  }
+
+  async setEnrichment(connectionId: string, tableName: string, columnName: string | null, description: string): Promise<void> {
+    if (!this.client) throw new Error('State database not initialized');
+    const colKey = columnName ?? '';
+    await this.client.query(
+      `INSERT INTO connection_scheme_enrichments (connection_id, table_name, column_name, description, updated_at)
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+       ON CONFLICT (connection_id, table_name, column_name)
+       DO UPDATE SET description = $4, updated_at = CURRENT_TIMESTAMP`,
+      [connectionId, tableName, colKey, description]
+    );
+  }
+
+  async getEnrichments(connectionId: string): Promise<SchemeEnrichmentRow[]> {
+    if (!this.client) throw new Error('State database not initialized');
+    const result = await this.client.query(
+      'SELECT connection_id, table_name, column_name, description, updated_at FROM connection_scheme_enrichments WHERE connection_id = $1 ORDER BY table_name, column_name',
+      [connectionId]
+    );
+    return (result.rows as { connection_id: string; table_name: string; column_name: string; description: string; updated_at?: Date }[]).map(row => ({
+      ...row,
+      column_name: row.column_name === '' ? null : row.column_name,
+    }));
+  }
+
+  async deleteEnrichment(connectionId: string, tableName: string, columnName: string | null): Promise<void> {
+    if (!this.client) throw new Error('State database not initialized');
+    const colKey = columnName ?? '';
+    await this.client.query(
+      'DELETE FROM connection_scheme_enrichments WHERE connection_id = $1 AND table_name = $2 AND column_name = $3',
+      [connectionId, tableName, colKey]
     );
   }
 }
