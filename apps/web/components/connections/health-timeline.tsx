@@ -44,7 +44,7 @@ export function HealthTimeline({
   return (
     <div
       className="flex items-center"
-      style={{ height: "4px", gap: "1px" }}
+      style={{ height: "14px", gap: "1px" }}
       title={
         healthStatus
           ? `Status: ${healthStatus}`

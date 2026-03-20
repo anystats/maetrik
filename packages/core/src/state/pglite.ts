@@ -48,11 +48,16 @@ export class PGLiteStateDatabase implements StateDatabase {
     await this.db.exec(`
       CREATE TABLE IF NOT EXISTS connection_health_log (
         connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
-        bucket_start TIMESTAMP NOT NULL,
+        bucket_start TIMESTAMPTZ NOT NULL,
         health_status TEXT NOT NULL DEFAULT 'green',
         degradation_message TEXT,
         PRIMARY KEY (connection_id, bucket_start)
       )
+    `);
+
+    // Migrate existing tables: TIMESTAMP -> TIMESTAMPTZ for correct timezone handling
+    await this.db.exec(`
+      ALTER TABLE connection_health_log ALTER COLUMN bucket_start TYPE TIMESTAMPTZ
     `);
   }
 
