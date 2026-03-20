@@ -127,4 +127,76 @@ describe('PGLiteStateDatabase', () => {
       expect(conn!.name).toBe('New Name');
     });
   });
+
+  describe('health observability', () => {
+    beforeEach(async () => {
+      await db.execute('DELETE FROM connections');
+      await db.createConnection({
+        id: 'health-test',
+        type: 'postgres',
+        options: { credentials: { host: 'localhost' } },
+      });
+    });
+
+    it('new connections default to green health status', async () => {
+      const conn = await db.getConnection('health-test');
+      expect(conn!.health_status).toBe('green');
+      expect(conn!.health_thresholds).toEqual({ connection_ms: 2000 });
+    });
+
+    it('updates connection health status', async () => {
+      await db.updateConnectionHealth('health-test', 'red');
+      const conn = await db.getConnection('health-test');
+      expect(conn!.health_status).toBe('red');
+    });
+
+    it('upserts health stats bucket', async () => {
+      const bucketStart = new Date('2026-03-20T10:00:00Z');
+      await db.upsertHealthStats('health-test', bucketStart, 'green');
+      const stats = await db.getHealthStats('health-test');
+      expect(stats).toHaveLength(1);
+      expect(stats[0].health_status).toBe('green');
+      expect(stats[0].connection_id).toBe('health-test');
+    });
+
+    it('upsert overwrites bucket when status is worse', async () => {
+      const bucketStart = new Date('2026-03-20T10:00:00Z');
+      await db.upsertHealthStats('health-test', bucketStart, 'green');
+      await db.upsertHealthStats('health-test', bucketStart, 'yellow', 'Slow response: 3200ms');
+      const stats = await db.getHealthStats('health-test');
+      expect(stats).toHaveLength(1);
+      expect(stats[0].health_status).toBe('yellow');
+      expect(stats[0].degradation_message).toBe('Slow response: 3200ms');
+    });
+
+    it('upsert does not downgrade bucket status', async () => {
+      const bucketStart = new Date('2026-03-20T10:00:00Z');
+      await db.upsertHealthStats('health-test', bucketStart, 'red', 'Connection failed');
+      await db.upsertHealthStats('health-test', bucketStart, 'green');
+      const stats = await db.getHealthStats('health-test');
+      expect(stats).toHaveLength(1);
+      expect(stats[0].health_status).toBe('red');
+      expect(stats[0].degradation_message).toBe('Connection failed');
+    });
+
+    it('prunes health stats older than 48 hours', async () => {
+      const old = new Date('2026-03-18T00:00:00Z');
+      const recent = new Date('2026-03-20T10:00:00Z');
+      await db.upsertHealthStats('health-test', old, 'green');
+      await db.upsertHealthStats('health-test', recent, 'green');
+      await db.pruneHealthStats('health-test');
+      const stats = await db.getHealthStats('health-test');
+      expect(stats).toHaveLength(1);
+      // Compare timestamps allowing for timezone offset differences in PGLite
+      expect(Math.abs(stats[0].bucket_start.getTime() - recent.getTime())).toBeLessThanOrEqual(3600000);
+    });
+
+    it('cascade deletes health stats when connection is deleted', async () => {
+      const bucket = new Date('2026-03-20T10:00:00Z');
+      await db.upsertHealthStats('health-test', bucket, 'green');
+      await db.deleteConnection('health-test');
+      const stats = await db.getHealthStats('health-test');
+      expect(stats).toHaveLength(0);
+    });
+  });
 });
