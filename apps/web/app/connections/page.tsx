@@ -41,6 +41,7 @@ import {
   type Connection,
   type DataSourceType,
 } from "@/lib/api";
+import { HealthTimeline } from "@/components/connections/health-timeline";
 
 export default function ConnectionsPage() {
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -168,6 +169,7 @@ export default function ConnectionsPage() {
               <TableHead className="w-12"></TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Health</TableHead>
               <TableHead className="w-20">Enabled</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
@@ -187,6 +189,9 @@ export default function ConnectionsPage() {
                     <Skeleton className="h-5 w-16" />
                   </TableCell>
                   <TableCell>
+                    <Skeleton className="h-3 w-24" />
+                  </TableCell>
+                  <TableCell>
                     <Skeleton className="h-5 w-9" />
                   </TableCell>
                   <TableCell>
@@ -197,7 +202,7 @@ export default function ConnectionsPage() {
             ) : connections.length === 0 ? (
               // Empty state
               <TableRow>
-                <TableCell colSpan={5} className="h-48">
+                <TableCell colSpan={6} className="h-48">
                   <div className="flex flex-col items-center justify-center text-center">
                     <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                       <Database className="h-6 w-6 text-muted-foreground" />
@@ -249,6 +254,13 @@ export default function ConnectionsPage() {
                       <Badge variant={getTypeBadgeVariant(connection.type)}>
                         {dsType?.name || connection.type}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <HealthTimeline
+                        healthLog={connection.health_log ?? []}
+                        blocks={48}
+                        healthStatus={connection.health_status}
+                      />
                     </TableCell>
                     <TableCell>
                       <Switch

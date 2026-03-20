@@ -3,12 +3,20 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 // Types
+export interface HealthBucket {
+  bucket_start: string;
+  health_status: 'green' | 'yellow' | 'red';
+  degradation_message?: string;
+}
+
 export interface Connection {
   id: string;
   type: string;
   name?: string;
   description?: string;
   enabled: boolean;
+  health_status?: 'green' | 'yellow' | 'red';
+  health_log?: HealthBucket[];
 }
 
 export interface ConnectionOptions {

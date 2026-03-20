@@ -62,6 +62,24 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
       health_status: c.health_status,
     }]));
 
+    // Fetch health logs for all connections in parallel
+    const healthLogsMap = new Map<string, { bucket_start: string; health_status: string; degradation_message?: string }[]>();
+    if (options.stateDb) {
+      const logs = await Promise.all(
+        configs.map(async (config) => ({
+          id: config.id,
+          stats: await options.stateDb!.getHealthStats(config.id),
+        }))
+      );
+      for (const { id, stats } of logs) {
+        healthLogsMap.set(id, stats.map(s => ({
+          bucket_start: s.bucket_start instanceof Date ? s.bucket_start.toISOString() : String(s.bucket_start),
+          health_status: s.health_status,
+          degradation_message: s.degradation_message ?? undefined,
+        })));
+      }
+    }
+
     const connectionList = configs.map((config) => {
       const metadata = metadataMap.get(config.id);
       return {
@@ -72,6 +90,7 @@ export function createConnectionsRouter(options: ConnectionsRouterOptions): Rout
         // File-config connections are always enabled, DB connections have explicit enabled flag
         enabled: metadata?.enabled ?? true,
         health_status: metadata?.health_status ?? 'green',
+        health_log: healthLogsMap.get(config.id) ?? [],
       };
     });
 
