@@ -13,7 +13,9 @@ import {
   type StateDatabase,
   type EncryptionManager,
 } from '@maetrik/core';
+import { createSchemeManager } from '@maetrik/core';
 import { createConnectionsRouter } from './routes/connections.js';
+import { createSchemesRouter } from './routes/schemes.js';
 import { createQueryRouter } from './routes/query.js';
 import { createAskRouter } from './routes/ask.js';
 import { createDataSourcesRouter } from './routes/datasources.js';
@@ -87,6 +89,19 @@ export function createApp(options: AppOptions): express.Express {
       timestamp: new Date().toISOString(),
     });
   });
+
+  // Scheme routes (requires stateDb for persistence)
+  if (options.stateDb) {
+    const schemeManager = createSchemeManager({
+      dataSourceManager,
+      stateDb: options.stateDb,
+    });
+
+    app.use(
+      '/api/v1/connections',
+      createSchemesRouter({ schemeManager, dataSourceManager })
+    );
+  }
 
   // Connections API (uses data source manager and state database)
   app.use(
