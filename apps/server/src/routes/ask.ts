@@ -1,22 +1,21 @@
 import { Router, Request, Response } from 'express';
-import type { DataSourceManager, LLMManager, QueryTranslator, StateDatabase } from '@maetrik/core';
-import type { SchemaDefinition, DataSourceSchemaDefinition } from '@maetrik/shared';
+import type { DataSourceManager, LLMManager, QueryTranslator, StateDatabase, EnrichedSchema, SchemeManager } from '@maetrik/core';
+import type { DataSourceSchemaDefinition } from '@maetrik/shared';
 
-// Convert array-based introspection schema to record-based schema for the translator
-function toTranslatorSchema(ds: DataSourceSchemaDefinition): SchemaDefinition {
-  const tables: SchemaDefinition['tables'] = {};
-  for (const table of ds.tables) {
-    tables[table.name] = {
+// Convert array-based introspection schema to EnrichedSchema format for the translator
+function toTranslatorSchema(connectionId: string, ds: DataSourceSchemaDefinition): EnrichedSchema {
+  return {
+    connectionId,
+    version: new Date().toISOString(),
+    tables: ds.tables.map((table) => ({
       name: table.name,
       columns: table.columns.map((c) => ({
         name: c.name,
         type: c.type,
         nullable: c.nullable,
-        primaryKey: c.isPrimaryKey,
       })),
-    };
-  }
-  return { tables };
+    })),
+  };
 }
 
 export interface AskRouterOptions {
@@ -158,7 +157,7 @@ export function createAskRouter(options: AskRouterOptions): Router {
 
       // Introspect schema and convert to translator format
       const rawSchema = await dataSource.introspect();
-      const schema = toTranslatorSchema(rawSchema);
+      const schema = toTranslatorSchema(connection, rawSchema);
       const dialect = getDialect(dataSource.type);
 
       // Translate natural language to SQL

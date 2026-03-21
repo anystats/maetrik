@@ -1,7 +1,7 @@
-import type { SchemaDefinition } from '@maetrik/shared';
+import type { EnrichedSchema } from '../schemes/types.js';
 
 export interface TranslationContext {
-  schema: SchemaDefinition;
+  schema: EnrichedSchema;
   dialect: string;
   maxRows?: number;
 }

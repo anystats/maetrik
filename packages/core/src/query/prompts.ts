@@ -1,20 +1,39 @@
-import type { SchemaDefinition } from '@maetrik/shared';
+import type { EnrichedSchema } from '../schemes/types.js';
 
-export function buildSchemaContext(schema: SchemaDefinition): string {
+export function buildSchemaContext(schema: EnrichedSchema): string {
   const lines: string[] = ['Available tables and columns:'];
 
-  for (const [tableName, table] of Object.entries(schema.tables)) {
+  for (const table of schema.tables) {
+    const pkColumns = new Set<string>();
+    for (const idx of table.indexes ?? []) {
+      if (idx.primaryKey) {
+        for (const col of idx.columns) {
+          pkColumns.add(col);
+        }
+      }
+    }
+
     const cols = table.columns
       .map((c) => {
-        const pk = c.primaryKey ? ' (PK)' : '';
+        const pk = pkColumns.has(c.name) ? ' (PK)' : '';
         const nullable = c.nullable ? '' : ' NOT NULL';
-        return `  - ${c.name}: ${c.type}${pk}${nullable}`;
+        const desc = c.description ? ` - ${c.description}` : '';
+        return `  - ${c.name}: ${c.type}${pk}${nullable}${desc}`;
       })
       .join('\n');
-    lines.push(`\nTable: ${tableName}`);
+
+    lines.push(`\nTable: ${table.name}`);
     if (table.description) {
       lines.push(`Description: ${table.description}`);
     }
+
+    if (table.foreignKeys && table.foreignKeys.length > 0) {
+      const fks = table.foreignKeys
+        .map((fk) => `  ${fk.column} -> ${fk.referencesTable}.${fk.referencesColumn}`)
+        .join('\n');
+      lines.push(`Foreign Keys:\n${fks}`);
+    }
+
     lines.push(cols);
   }
 

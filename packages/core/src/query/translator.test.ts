@@ -1,29 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryTranslator } from './translator.js';
 import type { LLMManager } from '../llm/types.js';
-import type { SchemaDefinition } from '@maetrik/shared';
+import type { EnrichedSchema } from '../schemes/types.js';
 
 describe('QueryTranslator', () => {
-  const mockSchema: SchemaDefinition = {
-    tables: {
-      users: {
+  const mockSchema: EnrichedSchema = {
+    connectionId: 'test-conn',
+    version: '20260321140000',
+    tables: [
+      {
         name: 'users',
         columns: [
-          { name: 'id', type: 'uuid', nullable: false, primaryKey: true },
+          { name: 'id', type: 'uuid', nullable: false },
           { name: 'email', type: 'varchar', nullable: false },
           { name: 'created_at', type: 'timestamp', nullable: false },
         ],
+        indexes: [{ name: 'users_pkey', columns: ['id'], unique: true, primaryKey: true }],
       },
-      orders: {
+      {
         name: 'orders',
         columns: [
-          { name: 'id', type: 'uuid', nullable: false, primaryKey: true },
+          { name: 'id', type: 'uuid', nullable: false },
           { name: 'user_id', type: 'uuid', nullable: false },
           { name: 'total', type: 'numeric', nullable: false },
           { name: 'status', type: 'varchar', nullable: false },
         ],
+        indexes: [{ name: 'orders_pkey', columns: ['id'], unique: true, primaryKey: true }],
       },
-    },
+    ],
   };
 
   const mockLLMManager: LLMManager = {
