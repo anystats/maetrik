@@ -56,7 +56,7 @@ Build order matters due to dependencies:
 2. `packages/core` - Business logic (data sources, connections, LLM, query translation, state database)
 3. `packages/datasource-postgres` - PostgreSQL data source driver
 4. `apps/server` - Express API server (depends on all above)
-5. `apps/web` - Next.js frontend (in development)
+5. `apps/web` - Next.js frontend (connections management, schema browser)
 
 ### Key Architectural Patterns
 
