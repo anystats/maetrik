@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Database,
+  TableProperties,
   Users,
   Settings,
   Zap,
@@ -19,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Connections", href: "/connections", icon: Database },
+  { name: "Schema", href: "/schema", icon: TableProperties },
   { name: "Users", href: "/users", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
   { name: "Design Kit", href: "/design-kit", icon: Palette },
