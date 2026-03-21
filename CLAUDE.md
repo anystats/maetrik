@@ -83,6 +83,15 @@ Build order matters due to dependencies:
 - Connections track `health_status` (green/yellow/red) and configurable `health_thresholds` (connection_ms)
 - `connection_health_log` table stores 30-min bucketed health stats (48h retention, worst-wins within bucket)
 
+**Connection Schemes** (`packages/core/src/schemes/`):
+- `manager.ts` - SchemeManager handles schema sync and enriched schema retrieval
+- `types.ts` - EnrichedSchema, SchemeManager interface
+- Immutable versioned snapshots of introspected schemas stored in state DB
+- Enrichments (human-curated descriptions) stored separately, survive re-introspection
+- `sync()` introspects source, compares with active scheme, stores if changed
+- `getEnrichedSchema()` merges active scheme with enrichments for LLM context
+- Callable programmatically for error recovery (e.g. stale schema detection)
+
 **Health Monitor** (`packages/core/src/health/`):
 - Background service checking connection health on a configurable interval (default 5min)
 - Only runs healthcheck when current 30-min bucket has no record yet
@@ -96,10 +105,11 @@ Build order matters due to dependencies:
 - Add new providers by implementing `LLMDriver` interface
 
 **Query Translation Flow** (`packages/core/src/query/`):
-1. `SemanticLayer` introspects data source schema
-2. `QueryTranslator` builds prompts with schema context and target query language
-3. LLM generates query (SQL for relational DBs, or native query language for others) with explanation and confidence
+1. `SchemeManager.getEnrichedSchema()` loads stored schema with descriptions
+2. `QueryTranslator` builds prompts with enriched schema context and target query language
+3. LLM generates query with explanation and confidence
 4. Query validated before execution (SELECT-only for SQL)
+5. On schema-related errors, `SchemeManager.sync()` re-introspects and retries
 
 ### API Endpoints (apps/server)
 
@@ -116,6 +126,12 @@ Build order matters due to dependencies:
 - `GET /api/v1/connections/:id/health` - Test connection health (writes stats, returns health_status + response_ms)
 - `GET /api/v1/connections/:id/health/log` - Get 48h health stats history (30-min buckets)
 - `GET /api/v1/connections/:id/schema` - Introspect schema
+
+**Schemes:**
+- `GET /api/v1/connections/:id/scheme` - Get active scheme with enrichments
+- `POST /api/v1/connections/:id/scheme/sync` - Trigger re-introspection
+- `PUT /api/v1/connections/:id/scheme/enrichments` - Set table/column description
+- `DELETE /api/v1/connections/:id/scheme/enrichments` - Remove description
 
 **Data Sources:**
 - `GET /api/v1/datasources/types` - List available driver types
@@ -151,6 +167,7 @@ stateDatabase:
 - Connection config resolver
 - State database implementations
 - LLM and query translation
+- Connection scheme management
 
 ## Key Files
 
@@ -159,4 +176,6 @@ stateDatabase:
 - `packages/core/src/connections/resolver.ts` - Multi-source connection resolver
 - `packages/core/src/state/pglite.ts` - PGLite state database
 - `packages/core/src/query/translator.ts` - NL to SQL translation logic
+- `packages/core/src/schemes/manager.ts` - Schema sync and enrichment service
 - `apps/server/src/routes/connections.ts` - Connections CRUD API
+- `apps/server/src/routes/schemes.ts` - Scheme API (sync, enrichments)
