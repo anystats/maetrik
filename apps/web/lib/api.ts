@@ -157,3 +157,88 @@ export interface DataSourceType {
 export async function listDataSourceTypes(): Promise<DataSourceType[]> {
   return fetchApi<DataSourceType[]>("/api/v1/datasources/types");
 }
+
+// Schema types
+export interface SchemeColumn {
+  name: string;
+  type: string;
+  nullable: boolean;
+  description?: string;
+}
+
+export interface SchemeIndex {
+  name: string;
+  columns: string[];
+  unique: boolean;
+  primaryKey?: boolean;
+}
+
+export interface SchemeForeignKey {
+  column: string;
+  referencesTable: string;
+  referencesColumn: string;
+}
+
+export interface SchemeTable {
+  name: string;
+  description?: string;
+  columns: SchemeColumn[];
+  indexes?: SchemeIndex[];
+  foreignKeys?: SchemeForeignKey[];
+}
+
+export interface EnrichedSchema {
+  connectionId: string;
+  version: string;
+  tables: SchemeTable[];
+}
+
+export interface SyncResult {
+  changed: boolean;
+  scheme: {
+    id: string;
+    connectionId: string;
+    version: string;
+  };
+}
+
+// Schema API calls
+export async function getConnectionScheme(id: string): Promise<EnrichedSchema> {
+  return fetchApi<EnrichedSchema>(`/api/v1/connections/${encodeURIComponent(id)}/scheme`);
+}
+
+export async function syncConnectionScheme(id: string): Promise<SyncResult> {
+  return fetchApi<SyncResult>(`/api/v1/connections/${encodeURIComponent(id)}/scheme/sync`, {
+    method: "POST",
+  });
+}
+
+export async function setSchemeEnrichment(
+  connectionId: string,
+  tableName: string,
+  columnName: string | null,
+  description: string
+): Promise<void> {
+  await fetchApi(`/api/v1/connections/${encodeURIComponent(connectionId)}/scheme/enrichments`, {
+    method: "PUT",
+    body: JSON.stringify({
+      tableName,
+      ...(columnName ? { columnName } : {}),
+      description,
+    }),
+  });
+}
+
+export async function deleteSchemeEnrichment(
+  connectionId: string,
+  tableName: string,
+  columnName: string | null
+): Promise<void> {
+  await fetchApi(`/api/v1/connections/${encodeURIComponent(connectionId)}/scheme/enrichments`, {
+    method: "DELETE",
+    body: JSON.stringify({
+      tableName,
+      ...(columnName ? { columnName } : {}),
+    }),
+  });
+}
