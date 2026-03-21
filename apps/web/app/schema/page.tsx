@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { TableCard } from "@/components/schema/table-card";
+import { DescriptionEditDialog } from "@/components/schema/description-edit-dialog";
 import {
   listConnections,
   getConnectionScheme,
@@ -248,6 +249,21 @@ export default function SchemaPage() {
           </div>
         )}
       </div>
+
+      <DescriptionEditDialog
+        open={editTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+        connectionId={selectedId!}
+        tableName={editTarget?.tableName ?? ""}
+        columnName={editTarget?.columnName ?? null}
+        currentDescription={editTarget?.currentDescription ?? ""}
+        onSaved={() => {
+          setEditTarget(null);
+          if (selectedId) loadScheme(selectedId);
+        }}
+      />
     </div>
   );
 }
