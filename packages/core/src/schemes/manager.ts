@@ -45,6 +45,35 @@ export function toSchemeTables(schema: DataSourceSchemaDefinition): SchemeTable[
   });
 }
 
+/**
+ * Deep equality check for SchemeTable arrays.
+ * Normalizes by sorting tables by name and columns by name to handle
+ * key reordering from jsonb storage in PostgreSQL.
+ */
+function schemasEqual(a: SchemeTable[], b: SchemeTable[]): boolean {
+  if (a.length !== b.length) return false;
+
+  const sortedA = [...a].sort((x, y) => x.name.localeCompare(y.name));
+  const sortedB = [...b].sort((x, y) => x.name.localeCompare(y.name));
+
+  for (let i = 0; i < sortedA.length; i++) {
+    const ta = sortedA[i];
+    const tb = sortedB[i];
+    if (ta.name !== tb.name) return false;
+
+    // Compare columns (sorted by name)
+    const colsA = [...ta.columns].sort((x, y) => x.name.localeCompare(y.name));
+    const colsB = [...tb.columns].sort((x, y) => x.name.localeCompare(y.name));
+    if (JSON.stringify(colsA) !== JSON.stringify(colsB)) return false;
+
+    // Compare indexes and foreignKeys (order-insensitive via sorted stringify)
+    if (JSON.stringify(ta.indexes ?? []) !== JSON.stringify(tb.indexes ?? [])) return false;
+    if (JSON.stringify(ta.foreignKeys ?? []) !== JSON.stringify(tb.foreignKeys ?? [])) return false;
+  }
+
+  return true;
+}
+
 export function createSchemeManager(options: SchemeManagerOptions): SchemeManager {
   const { dataSourceManager, stateDb } = options;
 
@@ -61,7 +90,7 @@ export function createSchemeManager(options: SchemeManagerOptions): SchemeManage
 
         const existing = await stateDb.getActiveScheme(connectionId);
 
-        if (existing && JSON.stringify(existing.tables) === JSON.stringify(tables)) {
+        if (existing && schemasEqual(existing.tables, tables)) {
           return {
             changed: false,
             scheme: {
